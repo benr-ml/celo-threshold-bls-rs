@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 // crypto imports
 use chacha20poly1305::{
     aead::{Aead, Error as AError, NewAead},
-    ChaCha20Poly1305,
+    ChaCha20Poly1305, Nonce,
 };
 use hkdf::Hkdf;
 use sha2::Sha256;
@@ -78,16 +78,16 @@ pub fn encrypt<C: Curve, R: RngCore>(to: &C::Point, msg: &[u8], rng: &mut R) -> 
     // derive an ephemeral key from the public key
     let ephemeral_key = derive::<C>(&dh);
 
-    // instantiate the AEAD scheme
-    let aead = ChaCha20Poly1305::new(ephemeral_key.into());
-
     // generate a random nonce
     let mut nonce: [u8; NONCE_LEN] = [0u8; NONCE_LEN];
     rng.fill_bytes(&mut nonce);
+    let nonce_obj = Nonce::from_slice(&nonce);
 
-    // do the encryption
+    // instantiate the AEAD scheme
+    let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
+
     let aead = aead
-        .encrypt(&nonce.into(), &msg[..])
+        .encrypt(&nonce_obj, &msg[..])
         .expect("aead should not fail");
 
     EciesCipher {
@@ -105,9 +105,11 @@ pub fn decrypt<C: Curve>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result
 
     let ephemeral_key = derive::<C>(&dh);
 
-    let aead = ChaCha20Poly1305::new((ephemeral_key).into());
+    let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
 
-    aead.decrypt(&cipher.nonce.into(), &cipher.aead[..])
+    let nonce_obj = Nonce::from_slice(&cipher.nonce);
+
+    aead.decrypt(&nonce_obj, &cipher.aead[..])
 }
 
 /// Derives an ephemeral key from the provided public key

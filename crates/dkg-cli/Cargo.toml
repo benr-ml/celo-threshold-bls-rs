@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 dkg-core = { path = "../dkg-core" }
-threshold-bls = { path = "../threshold-bls", default-features = false, features = ["bls12_377"] }
+threshold-bls = { path = "../threshold-bls", default-features = false, features = ["bls12_381"] }
 
 gumdrop = "0.7.0"
 rand = "0.7.3"

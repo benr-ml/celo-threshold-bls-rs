@@ -9,7 +9,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "blind_threshold_bls"
 
 [dependencies]
-threshold-bls = { path = "../threshold-bls", default-features = false, features = ["bls12_377"] }
+threshold-bls = { path = "../threshold-bls", default-features = false, features = ["bls12_381"] }
 bls-crypto = { git = "https://github.com/celo-org/bls-zexe" }
 
 rand_core = { version = "0.5.1", default-features = false }
