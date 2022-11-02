@@ -373,7 +373,7 @@ pub mod tests {
         default_threshold,
     };
     use std::fmt::Debug;
-    use threshold_bls::curve::bls12381::{Curve as BCurve, G1};
+    use threshold_bls::curve::bls12381::{G1Curve as BCurve, G1};
 
     use serde::{de::DeserializeOwned, Serialize};
     use static_assertions::assert_impl_all;
@@ -408,7 +408,7 @@ pub mod tests {
 
     #[test]
     fn test_full_dkg() {
-        let n = 5;
+        let n = 10;
         let thr = default_threshold(n);
         full_dkg(thr, setup_dkg::<BCurve>(n));
     }

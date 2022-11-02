@@ -181,9 +181,8 @@ mod tests {
     use rand::Rng;
     use threshold_bls::{
         curve::bls12381::{self, PairingCurve as BLS12_381},
-        curve::zexe::{self as bls12_377, PairingCurve as BLS12_377},
         poly::Idx,
-        sig::{BlindThresholdScheme, G1Scheme, G2Scheme, Scheme, SignatureScheme, ThresholdScheme},
+        sig::{G1Scheme, G2Scheme, Scheme, SignatureScheme, ThresholdScheme},
     };
     // helper to simulate a phase0 where a participant does not publish their
     // shares to the board
@@ -195,11 +194,8 @@ mod tests {
     #[tokio::test]
     async fn dkg_sign_e2e() {
         let (t, n) = (3, 5);
-        dkg_sign_e2e_curve::<bls12381::Curve, G1Scheme<BLS12_381>>(n, t).await;
+        dkg_sign_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(n, t).await;
         dkg_sign_e2e_curve::<bls12381::G2Curve, G2Scheme<BLS12_381>>(n, t).await;
-
-        dkg_sign_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(n, t).await;
-        dkg_sign_e2e_curve::<bls12_377::G2Curve, G2Scheme<BLS12_377>>(n, t).await;
     }
 
     #[tokio::test]
@@ -207,23 +203,23 @@ mod tests {
         let (t, n) = (4, 6);
         let new_t = 4;
         // 4-of-6 reshare w/ phase 3
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(
             false, 2, 2, new_t, t, n,
         )
         .await;
         // 4-of-6 reshare w/o phase 3
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, 2, 2, new_t, t, n)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, 2, 2, new_t, t, n)
             .await;
     }
 
     #[tokio::test]
     async fn dkg_resharing_e2e_downsize() {
         // 4-of-6 to 3-of-4 (3 leave, 1 joins)
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, 3, 1, 3, 4, 6)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, 3, 1, 3, 4, 6)
             .await;
 
         // 4-of-6 to 3-of-4 (2 leave, no-one joins, goes to phase 3)
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(false, 2, 0, 3, 4, 6)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(false, 2, 0, 3, 4, 6)
             .await;
     }
 
@@ -232,22 +228,22 @@ mod tests {
         let (t, n) = (4, 6);
 
         // Replace with 4-of-6
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, n, 6, 4, t, n)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, n, 6, 4, t, n)
             .await;
 
         // Replace with 7-of-8
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, n, 8, 7, t, n)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, n, 8, 7, t, n)
             .await;
     }
 
     #[tokio::test]
     async fn dkg_resharing_e2e_all_leave_downsize() {
         // 4-of-6 -> 3-of-4
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, 6, 4, 3, 4, 6)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, 6, 4, 3, 4, 6)
             .await;
 
         // 7-of-8 -> 3-of-3
-        dkg_resharing_e2e_curve::<bls12_377::G1Curve, G1Scheme<BLS12_377>>(true, 8, 3, 3, 7, 8)
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, 8, 3, 3, 7, 8)
             .await;
     }
 
@@ -339,7 +335,6 @@ mod tests {
         C: Curve,
         // We need to bind the Curve's Point and Scalars to the Scheme
         S: Scheme<Public = <C as Curve>::Point, Private = <C as Curve>::Scalar>
-            + BlindThresholdScheme
             + ThresholdScheme
             + SignatureScheme,
     {
@@ -350,26 +345,20 @@ mod tests {
         let (board, phase0s) = setup::<C, S, _>(n, t, rng);
         let outputs = run_dkg(board, phase0s, rng, 0).await;
 
-        // blinds the message
-        let (token, blinded_msg) = S::blind_msg(&msg[..], &mut rand::thread_rng());
-
         // generates a partial sig with each share from the dkg
         let partial_sigs = outputs
             .iter()
-            .map(|output| S::sign_blind_partial(&output.share, &blinded_msg[..]).unwrap())
+            .map(|output| S::partial_sign(&output.share, &msg[..]).unwrap())
             .collect::<Vec<_>>();
 
         // aggregates them
-        let blinded_sig = S::aggregate(t, &partial_sigs).unwrap();
-
-        // the user unblinds it
-        let unblinded_sig = S::unblind_sig(&token, &blinded_sig).unwrap();
+        let sigs = S::aggregate(t, &partial_sigs).unwrap();
 
         // get the public key (we have already checked that all outputs' pubkeys are the same)
         let pubkey = outputs[0].public.public_key();
 
         // verify the threshold signature
-        S::verify(&pubkey, &msg, &unblinded_sig).unwrap();
+        S::verify(&pubkey, &msg, &sigs).unwrap();
     }
 
     async fn run_dkg<C, P, R>(
@@ -435,7 +424,7 @@ mod tests {
         let honest = n - bad;
 
         let rng = &mut rand::thread_rng();
-        let (mut board, phase0s) = setup::<bls12_377::G1Curve, G1Scheme<BLS12_377>, _>(n, t, rng);
+        let (mut board, phase0s) = setup::<bls12381::G1Curve, G1Scheme<BLS12_381>, _>(n, t, rng);
 
         let mut phase1s = Vec::new();
         for (i, phase0) in phase0s.into_iter().enumerate() {
@@ -490,7 +479,7 @@ mod tests {
         let (t, n) = (5, 8);
         let bad = 2; // >0 people not broadcasting in the start force us to go to phase 3
         let rng = &mut rand::thread_rng();
-        let (board, phase0s) = setup::<bls12_377::G1Curve, G1Scheme<BLS12_377>, _>(n, t, rng);
+        let (board, phase0s) = setup::<bls12381::G1Curve, G1Scheme<BLS12_381>, _>(n, t, rng);
         let outputs = run_dkg_phase3(board, phase0s, rng, bad).await;
 
         // the first people must have a different public key from the others

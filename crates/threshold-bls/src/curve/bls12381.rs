@@ -156,7 +156,7 @@ impl Element for GT {
 }
 
 /// alias to BLS12-381's G1 group
-pub type Curve = group::G1Curve<PairingCurve>;
+pub type G1Curve = group::G1Curve<PairingCurve>;
 
 /// alias to BLS12-381's G2 Group
 pub type G2Curve = group::G2Curve<PairingCurve>;
