@@ -3,7 +3,7 @@ use crate::{
     curve::group::{Element, Point, Scalar},
     primitives::poly::Poly,
 };
-use rand_core::{RngCore, CryptoRng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{error::Error, fmt::Debug};
 

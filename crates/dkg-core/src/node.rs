@@ -186,7 +186,10 @@ mod tests {
     };
     // helper to simulate a phase0 where a participant does not publish their
     // shares to the board
-    fn bad_phase0<C: Curve, R: CryptoRng + RngCore, P: Phase0<C>>(phase0: P, rng: &mut R) -> P::Next {
+    fn bad_phase0<C: Curve, R: CryptoRng + RngCore, P: Phase0<C>>(
+        phase0: P,
+        rng: &mut R,
+    ) -> P::Next {
         let (next, _) = phase0.encrypt_shares(rng).unwrap();
         next
     }
@@ -203,10 +206,8 @@ mod tests {
         let (t, n) = (4, 6);
         let new_t = 4;
         // 4-of-6 reshare w/ phase 3
-        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(
-            false, 2, 2, new_t, t, n,
-        )
-        .await;
+        dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(false, 2, 2, new_t, t, n)
+            .await;
         // 4-of-6 reshare w/o phase 3
         dkg_resharing_e2e_curve::<bls12381::G1Curve, G1Scheme<BLS12_381>>(true, 2, 2, new_t, t, n)
             .await;

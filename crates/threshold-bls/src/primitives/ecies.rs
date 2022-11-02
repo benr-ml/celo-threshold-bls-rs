@@ -29,7 +29,7 @@
 //! ```
 
 use crate::curve::group::{Curve, Element};
-use rand_core::{RngCore, CryptoRng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 // crypto imports
@@ -66,7 +66,11 @@ pub struct EciesCipher<C: Curve> {
 }
 
 /// Encrypts the message with a public key (curve point) and returns a ciphertext
-pub fn encrypt<C: Curve, R: CryptoRng + RngCore>(to: &C::Point, msg: &[u8], rng: &mut R) -> EciesCipher<C> {
+pub fn encrypt<C: Curve, R: CryptoRng + RngCore>(
+    to: &C::Point,
+    msg: &[u8],
+    rng: &mut R,
+) -> EciesCipher<C> {
     let eph_secret = C::Scalar::rand(rng);
 
     let mut ephemeral = C::Point::one();

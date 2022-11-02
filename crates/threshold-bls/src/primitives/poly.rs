@@ -1,5 +1,5 @@
 use crate::curve::group::{Curve, Element, Point, Scalar};
-use rand_core::{RngCore, CryptoRng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;

@@ -8,8 +8,8 @@ use crate::primitives::{
 use rand_core::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use threshold_bls::{
-    primitives::ecies,
     curve::group::{Curve, Element},
+    primitives::ecies,
     primitives::poly::{Idx, PrivatePoly, PublicPoly},
 };
 

@@ -159,7 +159,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::curve::bls12381::{G1Curve as G1Curve, G2Curve, PairingCurve as PCurve};
+    use crate::curve::bls12381::{G1Curve, G2Curve, PairingCurve as PCurve};
     use crate::curve::group::Curve;
     use rand::prelude::*;
 

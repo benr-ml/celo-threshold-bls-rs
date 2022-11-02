@@ -1,6 +1,6 @@
 //! Traits for operating on Groups and Elliptic Curves.
 
-use rand_core::{RngCore, CryptoRng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;

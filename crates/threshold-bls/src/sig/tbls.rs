@@ -2,9 +2,9 @@
 //! [`SignatureScheme`](../trait.SignatureScheme.html)
 use crate::primitives::poly::{Eval, Idx, Poly, PolyError};
 use crate::sig::{Partial, SignatureScheme, ThresholdScheme};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use rayon::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// A private share which is part of the threshold signing key
@@ -93,7 +93,6 @@ impl<I: SignatureScheme> ThresholdScheme for I {
     }
 }
 
-
 use crate::{
     curve::bls12381::PairingCurve as PCurve,
     sig::{
@@ -122,8 +121,11 @@ fn shares<T: ThresholdScheme>(n: usize, t: usize) -> (Vec<Share<T::Private>>, Po
     (shares, private.commit())
 }
 
-fn test_threshold_scheme<T: ThresholdScheme + SignatureScheme>(threshold: usize, creator: ShareCreator<T>) {
-    let (shares, public) = creator(threshold+1, threshold);
+fn test_threshold_scheme<T: ThresholdScheme + SignatureScheme>(
+    threshold: usize,
+    creator: ShareCreator<T>,
+) {
+    let (shares, public) = creator(threshold + 1, threshold);
     let msg = vec![1, 9, 6, 9];
 
     let partials: Vec<_> = shares
@@ -181,6 +183,6 @@ mod tests {
     #[test]
     fn threshold_g2() {
         type S = G2Scheme<PCurve>;
-        test_threshold_scheme::<S>(100,shares::<S>);
+        test_threshold_scheme::<S>(100, shares::<S>);
     }
 }
