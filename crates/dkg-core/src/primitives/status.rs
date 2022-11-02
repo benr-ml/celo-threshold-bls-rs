@@ -1,7 +1,7 @@
 use bitvec::{prelude::*, vec::BitVec};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use threshold_bls::poly::Idx;
+use threshold_bls::primitives::poly::Idx;
 
 /// A `Status` holds the claim of a validity or not of a share from the point of
 /// a view of the share holder. A status is sent inside a `Response` during the

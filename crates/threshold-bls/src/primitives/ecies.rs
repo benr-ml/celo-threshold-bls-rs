@@ -7,10 +7,11 @@
 //!
 //! ```rust
 //! use threshold_bls::{
-//!     ecies::{encrypt, decrypt},
+//!     primitives::ecies::{encrypt, decrypt},
 //!     curve::bls12381::G2Curve,
-//!     group::{Curve, Element}
-//! };
+//!     curve::group::Curve,
+//!     curve::group::Element,
+//!     };
 //!
 //! let message = b"hello";
 //! let rng = &mut rand::thread_rng();
@@ -27,8 +28,8 @@
 //! assert_eq!(&message[..], &cleartext[..]);
 //! ```
 
-use crate::group::{Curve, Element};
-use rand_core::RngCore;
+use crate::curve::group::{Curve, Element};
+use rand_core::{RngCore, CryptoRng};
 use serde::{Deserialize, Serialize};
 
 // crypto imports
@@ -65,7 +66,7 @@ pub struct EciesCipher<C: Curve> {
 }
 
 /// Encrypts the message with a public key (curve point) and returns a ciphertext
-pub fn encrypt<C: Curve, R: RngCore>(to: &C::Point, msg: &[u8], rng: &mut R) -> EciesCipher<C> {
+pub fn encrypt<C: Curve, R: CryptoRng + RngCore>(to: &C::Point, msg: &[u8], rng: &mut R) -> EciesCipher<C> {
     let eph_secret = C::Scalar::rand(rng);
 
     let mut ephemeral = C::Point::one();

@@ -1,5 +1,5 @@
-use crate::group::{Curve, Element, Point, Scalar};
-use rand_core::RngCore;
+use crate::curve::group::{Curve, Element, Point, Scalar};
+use rand_core::{RngCore, CryptoRng};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
@@ -46,7 +46,7 @@ impl<C: Element> Poly<C> {
     /// Returns a new polynomial of the given degree where each coefficients is
     /// sampled at random from the given RNG.
     /// In the context of secret sharing, the threshold is the degree + 1.
-    pub fn new_from<R: RngCore>(degree: usize, rng: &mut R) -> Self {
+    pub fn new_from<R: CryptoRng + RngCore>(degree: usize, rng: &mut R) -> Self {
         let coeffs: Vec<C> = (0..=degree).map(|_| C::rand(rng)).collect();
         Self::from(coeffs)
     }

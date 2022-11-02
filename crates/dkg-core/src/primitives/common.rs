@@ -5,12 +5,12 @@ use crate::primitives::{
     DKGError, DKGResult, ShareError,
 };
 
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use threshold_bls::{
-    ecies,
-    group::{Curve, Element},
-    poly::{Idx, PrivatePoly, PublicPoly},
+    primitives::ecies,
+    curve::group::{Curve, Element},
+    primitives::poly::{Idx, PrivatePoly, PublicPoly},
 };
 
 pub type ShareInfo<C> = HashMap<Idx, <C as Curve>::Scalar>;
@@ -77,7 +77,7 @@ pub fn share_correct<C: Curve>(idx: Idx, share: &C::Scalar, public: &PublicPoly<
 
 /// Creates the encrypted shares with the given secret polynomial to the given
 /// group.
-pub fn create_share_bundle<C: Curve, R: RngCore>(
+pub fn create_share_bundle<C: Curve, R: CryptoRng + RngCore>(
     dealer_idx: Idx,
     secret: &PrivatePoly<C>,
     public: &PublicPoly<C>,
@@ -298,7 +298,7 @@ pub mod tests {
     use super::*;
     use crate::primitives::phases::{Phase0, Phase1, Phase2, Phase3};
     use rand::thread_rng;
-    use threshold_bls::poly::{Eval, Poly, PolyError};
+    use threshold_bls::primitives::poly::{Eval, Poly, PolyError};
 
     fn reconstruct<C: Curve>(
         thr: usize,

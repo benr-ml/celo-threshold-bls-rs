@@ -1,6 +1,6 @@
 use super::{default_threshold, minimum_threshold, DKGError, DKGResult};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use threshold_bls::{group::Curve, poly::Idx};
+use threshold_bls::{curve::group::Curve, primitives::poly::Idx};
 
 /// Node is a participant in the DKG protocol. In a DKG protocol, each
 /// participant must be identified both by an index and a public key. At the end

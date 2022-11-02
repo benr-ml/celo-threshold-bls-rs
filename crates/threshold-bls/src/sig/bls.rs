@@ -1,4 +1,4 @@
-use crate::group::{Element, PairingCurve, Point};
+use crate::curve::group::{Element, PairingCurve, Point};
 use crate::sig::{Scheme, SignatureScheme};
 use std::{fmt::Debug, marker::PhantomData};
 use thiserror::Error;
@@ -160,7 +160,7 @@ where
 mod tests {
     use super::*;
     use crate::curve::bls12381::{G1Curve as G1Curve, G2Curve, PairingCurve as PCurve};
-    use crate::group::Curve;
+    use crate::curve::group::Curve;
     use rand::prelude::*;
 
     fn keypair<C: Curve>() -> (C::Scalar, C::Point) {

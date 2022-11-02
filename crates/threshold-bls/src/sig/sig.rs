@@ -1,9 +1,9 @@
 pub use super::tbls::Share; // import and re-export it for easier access
 use crate::{
-    group::{Element, Point, Scalar},
-    poly::Poly,
+    curve::group::{Element, Point, Scalar},
+    primitives::poly::Poly,
 };
-use rand_core::RngCore;
+use rand_core::{RngCore, CryptoRng};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{error::Error, fmt::Debug};
 
@@ -23,7 +23,7 @@ pub trait Scheme: Debug {
     type Signature: Point<RHS = Self::Private> + Serialize + DeserializeOwned;
 
     /// Returns a new fresh keypair usable by the scheme.
-    fn keypair<R: RngCore>(rng: &mut R) -> (Self::Private, Self::Public) {
+    fn keypair<R: CryptoRng + RngCore>(rng: &mut R) -> (Self::Private, Self::Public) {
         let private = Self::Private::rand(rng);
 
         let mut public = Self::Public::one();
@@ -41,7 +41,7 @@ pub trait Scheme: Debug {
 ///  # #[cfg(feature = "bls12_381")]
 ///  # {
 ///  use rand::prelude::*;
-///  use threshold_bls::{sig::{SignatureScheme, Scheme, G2Scheme}, group::{Element, Point}};
+///  use threshold_bls::{sig::{SignatureScheme, Scheme, G2Scheme}, curve::group::{Element, Point}};
 ///  use threshold_bls::curve::bls12381::PairingCurve as PC;
 ///
 ///  let msg = vec![1,9,6,9];

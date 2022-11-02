@@ -29,12 +29,12 @@ There is an implementation of these traits using the curve BLS12-381 in
 
 ## Polynomial functionality
 
-[`src/poly.rs`](src/poly.rs) contains the implementation of a polynomial
+[`src/poly.rs`](src/primitives/poly.rs) contains the implementation of a polynomial
 suitable to be used for secret sharing schemes and the dkg protocol. It can
 evaluates shares and interpolate private and public shares to their
 corresponding polynomial.
 
-The following (from the [tests](src/poly.rs#L264)) shows how to interploate
+The following (from the [tests](src/primitives/poly.rs#L264)) shows how to interploate
 a set of private shares:
 
 ```rust
@@ -63,8 +63,6 @@ You can use them like this when adding the dependency to your `Cargo.toml` file.
 ```toml
 # Only bls12_381
 threshold = { version = "0.1", default-features = false, features = ["bls12_381"] }
-# Only bls12_377
-threshold = { version = "0.1", default-features = false, features = ["bls12_377"] }
 # Both
 threshold = { version = "0.1" }
 ```

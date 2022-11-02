@@ -28,7 +28,7 @@
 //!
 //! ```rust
 //! use threshold_bls::{
-//!     poly::{Poly, Idx},
+//!     primitives::poly::{Poly, Idx},
 //!     schemes::bls12_381::G1Scheme as SigScheme,
 //!     sig::{Scheme, SignatureScheme, ThresholdScheme, Share}
 //! };
@@ -140,16 +140,7 @@
 /// Curve implementations for the traits defined in the [`group`](group/index.html) module.
 pub mod curve;
 
-/// Elliptic Curve Integrated Encryption Scheme using SHA256 as the Key Derivation
-pub mod ecies;
-
-/// Definitions of generic traits with scalars of prime fields and points on elliptic curves.
-pub mod group;
-
-/// Implementation of a polynomial suitable to be used for secret sharing schemes and DKG
-/// protocols. It can evaluate and interpolate private and public shares to their corresponding
-/// polynomial.
-pub mod poly;
+pub mod primitives;
 
 /// BLS Signature implementations. Supports blind and threshold signatures.
 pub mod sig;
@@ -162,18 +153,6 @@ pub mod schemes {
         use crate::curve::bls12381::PairingCurve;
 
         pub use crate::curve::bls12381::{G1Curve as G1Curve, G2Curve};
-
-        /// Public Keys on G1, Signatures on G2
-        pub type G1Scheme = super::G1Scheme<PairingCurve>;
-        /// Public Keys on G2, Signatures on G1
-        pub type G2Scheme = super::G2Scheme<PairingCurve>;
-    }
-
-    #[cfg(feature = "bls12_377")]
-    /// BLS12-377 Schemes
-    pub mod bls12_377 {
-        use crate::curve::zexe::PairingCurve;
-        pub use crate::curve::zexe::{G1Curve, G2Curve};
 
         /// Public Keys on G1, Signatures on G2
         pub type G1Scheme = super::G1Scheme<PairingCurve>;

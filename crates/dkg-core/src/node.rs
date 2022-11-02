@@ -8,9 +8,9 @@ use super::{
 };
 
 use async_trait::async_trait;
-use rand::RngCore;
+use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use threshold_bls::group::Curve;
+use threshold_bls::curve::group::Curve;
 
 #[derive(Debug, Error)]
 /// Error thrown while running the DKG or while publishing to the board
@@ -53,7 +53,7 @@ impl<C, B, R, P> DKGPhase<C, B, &mut R> for P
 where
     C: Curve,
     B: BoardPublisher<C>,
-    R: RngCore,
+    R: CryptoRng + RngCore,
     P: Phase0<C>,
 {
     type Next = P::Next;
@@ -181,12 +181,12 @@ mod tests {
     use rand::Rng;
     use threshold_bls::{
         curve::bls12381::{self, PairingCurve as BLS12_381},
-        poly::Idx,
+        primitives::poly::Idx,
         sig::{G1Scheme, G2Scheme, Scheme, SignatureScheme, ThresholdScheme},
     };
     // helper to simulate a phase0 where a participant does not publish their
     // shares to the board
-    fn bad_phase0<C: Curve, R: RngCore, P: Phase0<C>>(phase0: P, rng: &mut R) -> P::Next {
+    fn bad_phase0<C: Curve, R: CryptoRng + RngCore, P: Phase0<C>>(phase0: P, rng: &mut R) -> P::Next {
         let (next, _) = phase0.encrypt_shares(rng).unwrap();
         next
     }
@@ -370,7 +370,7 @@ mod tests {
     where
         C: Curve,
         P: Phase0<C>,
-        R: RngCore,
+        R: CryptoRng + RngCore,
     {
         // Phase 1: Publishes shares
         let mut phase1s = Vec::new();
@@ -498,7 +498,7 @@ mod tests {
     where
         C: Curve + PartialEq,
         P: Phase0<C>,
-        R: RngCore,
+        R: CryptoRng + RngCore,
     {
         let mut phase1s = Vec::new();
         for (i, phase0) in phase0s.into_iter().enumerate() {
@@ -556,7 +556,7 @@ mod tests {
         outputs
     }
 
-    fn setup<C, S, R: rand::RngCore>(
+    fn setup<C, S, R: rand::CryptoRng + rand::RngCore>(
         n: usize,
         t: usize,
         rng: &mut R,

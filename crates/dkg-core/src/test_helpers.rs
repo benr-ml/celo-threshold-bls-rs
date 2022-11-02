@@ -1,7 +1,7 @@
 use super::board::BoardPublisher;
 use super::primitives::types::{BundledJustification, BundledResponses, BundledShares};
 use async_trait::async_trait;
-use threshold_bls::group::Curve;
+use threshold_bls::curve::group::Curve;
 
 /// An in-memory board used for testing
 pub struct InMemoryBoard<C: Curve> {

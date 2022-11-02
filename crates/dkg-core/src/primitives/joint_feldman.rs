@@ -11,12 +11,12 @@ use crate::primitives::{
 };
 
 use threshold_bls::{
-    group::{Curve, Element},
-    poly::{Idx, Poly, PrivatePoly, PublicPoly},
+    curve::group::{Curve, Element},
+    primitives::poly::{Idx, Poly, PrivatePoly, PublicPoly},
     sig::Share,
 };
 
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 
@@ -70,7 +70,7 @@ impl<C: Curve> DKG<C> {
     /// Creates a new DKG instance from the provided private key, group and RNG.
     ///
     /// The private key must be part of the group, otherwise this will return an error.
-    pub fn new_rand<R: RngCore>(
+    pub fn new_rand<R: CryptoRng + RngCore>(
         private_key: C::Scalar,
         group: Group<C>,
         rng: &mut R,
@@ -106,7 +106,7 @@ impl<C: Curve> Phase0<C> for DKG<C> {
     /// Evaluates the secret polynomial at the index of each DKG participant and encrypts
     /// the result with the corresponding public key. Returns the bundled encrypted shares
     /// as well as the next phase of the DKG.
-    fn encrypt_shares<R: RngCore>(
+    fn encrypt_shares<R: CryptoRng + RngCore>(
         self,
         rng: &mut R,
     ) -> DKGResult<(DKGWaitingShare<C>, Option<BundledShares<C>>)> {

@@ -36,7 +36,7 @@ allow passing authentication information over the wire on each call.
 We assume public key infrastructure. Before the DKG starts, each participant creates a 
 keypair and share their public key with each other participant. After evaluating the polynomial
 at each participant's index, the shares are encrypted with the corresponding participant's public
-key using an [Elliptic Curve Integrated Encryption Scheme](./../threshold-bls/src/ecies.rs) and 
+key using an [Elliptic Curve Integrated Encryption Scheme](../threshold-bls/src/primitives/ecies.rs) and 
 then are sent to the broadcast channel.
 
 ## Protocol Choice Note

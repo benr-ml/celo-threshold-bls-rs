@@ -14,12 +14,12 @@ use crate::primitives::{
 };
 
 use threshold_bls::{
-    group::{Curve, Element},
-    poly::{Eval, Idx, Poly, PrivatePoly, PublicPoly},
+    curve::group::{Curve, Element},
+    primitives::poly::{Eval, Idx, Poly, PrivatePoly, PublicPoly},
     sig::Share,
 };
 
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cell::RefCell, fmt::Debug};
 
@@ -77,7 +77,7 @@ impl<C: Curve> RDKG<C> {
         Self::new_from_share_rng(private_key, curr_share, new_group, &mut thread_rng())
     }
 
-    pub fn new_from_share_rng<R: RngCore>(
+    pub fn new_from_share_rng<R: CryptoRng + RngCore>(
         private_key: C::Scalar,
         curr_share: DKGOutput<C>,
         new_group: Group<C>,
@@ -134,7 +134,7 @@ impl<C: Curve> RDKG<C> {
 
 impl<C: Curve> Phase0<C> for RDKG<C> {
     type Next = RDKGWaitingShare<C>;
-    fn encrypt_shares<R: RngCore>(
+    fn encrypt_shares<R: CryptoRng + RngCore>(
         self,
         rng: &mut R,
     ) -> DKGResult<(RDKGWaitingShare<C>, Option<BundledShares<C>>)> {
@@ -524,7 +524,7 @@ mod tests {
     };
     use threshold_bls::{
         curve::bls12381::{G1Curve as BCurve, Scalar, G1},
-        ecies,
+        primitives::ecies,
     };
 
     use rand::prelude::*;

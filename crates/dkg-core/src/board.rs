@@ -6,7 +6,7 @@ use super::primitives::types::{BundledJustification, BundledResponses, BundledSh
 use async_trait::async_trait;
 use bincode::serialize_into;
 use std::io::Write;
-use threshold_bls::group::Curve;
+use threshold_bls::curve::group::Curve;
 
 /// Trait which must be implemented for writing to the board. This trait assumes
 /// an authenticated channel.

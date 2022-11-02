@@ -2,10 +2,10 @@ use crate::primitives::{
     types::{BundledJustification, BundledResponses, BundledShares, DKGOutput},
     DKGError, DKGResult,
 };
-use rand::RngCore;
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use threshold_bls::group::Curve;
+use threshold_bls::curve::group::Curve;
 
 use std::fmt::Debug;
 
@@ -15,7 +15,7 @@ use std::fmt::Debug;
 pub trait Phase0<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
     type Next: Phase1<C>;
 
-    fn encrypt_shares<R: RngCore>(
+    fn encrypt_shares<R: CryptoRng + RngCore>(
         self,
         rng: &mut R,
     ) -> DKGResult<(Self::Next, Option<BundledShares<C>>)>;

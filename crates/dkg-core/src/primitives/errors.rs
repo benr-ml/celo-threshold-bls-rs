@@ -1,5 +1,5 @@
 use thiserror::Error;
-use threshold_bls::{ecies::EciesError, poly, poly::Idx};
+use threshold_bls::primitives::{ecies::EciesError, poly, poly::Idx};
 
 /// Result type alias which returns `DKGError`
 pub type DKGResult<A> = Result<A, DKGError>;

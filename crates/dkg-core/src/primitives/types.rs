@@ -3,9 +3,9 @@ use crate::primitives::{group::Group, status::Status};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use threshold_bls::{
-    ecies::EciesCipher,
-    group::Curve,
-    poly::{Idx, PublicPoly},
+    primitives::ecies::EciesCipher,
+    curve::group::Curve,
+    primitives::poly::{Idx, PublicPoly},
     sig::Share,
 };
 
