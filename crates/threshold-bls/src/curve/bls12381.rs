@@ -3,7 +3,7 @@ use ff::{Field, PrimeField};
 use groupy::CurveProjective;
 use paired::bls12_381::{Bls12, Fq12, Fr, FrRepr, G1 as PG1, G2 as PG2};
 use paired::Engine;
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use std::result::Result;
 use thiserror::Error;
 
@@ -22,27 +22,6 @@ pub enum BellmanError {
     PrimeFieldDecodingError(#[from] ff::PrimeFieldDecodingError),
     #[error("Group Decoding Error: {0}")]
     GroupDecodingError(#[from] groupy::GroupDecodingError),
-}
-
-impl Element for Scalar {
-    type RHS = Fr;
-
-    fn new() -> Self {
-        ff::Field::zero()
-    }
-
-    fn one() -> Self {
-        ff::Field::one()
-    }
-    fn add(&mut self, s2: &Self) {
-        self.add_assign(s2);
-    }
-    fn mul(&mut self, mul: &Fr) {
-        self.mul_assign(mul)
-    }
-    fn rand<R: RngCore>(rng: &mut R) -> Self {
-        Fr::random(rng)
-    }
 }
 
 /// Implementation of Scalar using field elements used in BLS12-381
@@ -64,6 +43,26 @@ impl Sc for Scalar {
     }
 }
 
+impl Element for Scalar {
+    type RHS = Fr;
+
+    fn new() -> Self {
+        ff::Field::zero()
+    }
+    fn one() -> Self {
+        ff::Field::one()
+    }
+    fn add(&mut self, s2: &Self) {
+        self.add_assign(s2);
+    }
+    fn mul(&mut self, mul: &Fr) {
+        self.mul_assign(mul)
+    }
+    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Fr::random(rng)
+    }
+}
+
 /// G1 points can be multiplied by Fr elements
 impl Element for G1 {
     type RHS = Scalar;
@@ -71,22 +70,14 @@ impl Element for G1 {
     fn new() -> Self {
         groupy::CurveProjective::zero()
     }
-
     fn one() -> Self {
         groupy::CurveProjective::one()
     }
-
-    fn rand<R: RngCore>(rng: &mut R) -> Self {
-        G1::random(rng)
-    }
-
-    fn add(&mut self, s2: &Self) {
-        self.add_assign(s2);
-    }
-
+    fn add(&mut self, s2: &Self) { self.add_assign(s2); }
     fn mul(&mut self, mul: &Scalar) {
         self.mul_assign(FrRepr::from(*mul))
     }
+    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self { G1::random(rng) }
 }
 
 impl Element for G2 {
@@ -95,21 +86,37 @@ impl Element for G2 {
     fn new() -> Self {
         groupy::CurveProjective::zero()
     }
-
     fn one() -> Self {
         groupy::CurveProjective::one()
     }
-
-    fn rand<R: RngCore>(rng: &mut R) -> Self {
-        G2::random(rng)
-    }
-
     fn add(&mut self, s2: &Self) {
         self.add_assign(s2);
     }
-
     fn mul(&mut self, mul: &Scalar) {
         self.mul_assign(FrRepr::from(*mul))
+    }
+    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        G2::random(rng)
+    }
+}
+
+impl Element for GT {
+    type RHS = GT;
+
+    fn new() -> Self {
+        ff::Field::zero()
+    }
+    fn one() -> Self {
+        ff::Field::one()
+    }
+    fn add(&mut self, s2: &Self) {
+        self.add_assign(s2);
+    }
+    fn mul(&mut self, mul: &GT) {
+        self.mul_assign(mul)
+    }
+    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        ff::Field::random(rng)
     }
 }
 
@@ -133,50 +140,22 @@ impl Point for G2 {
     }
 }
 
-impl Element for GT {
-    type RHS = GT;
-
-    fn new() -> Self {
-        ff::Field::zero()
-    }
-
-    fn one() -> Self {
-        ff::Field::one()
-    }
-    fn add(&mut self, s2: &Self) {
-        self.add_assign(s2);
-    }
-    fn mul(&mut self, mul: &GT) {
-        self.mul_assign(mul)
-    }
-
-    fn rand<R: RngCore>(rng: &mut R) -> Self {
-        ff::Field::random(rng)
-    }
-}
-
-/// alias to BLS12-381's G1 group
-pub type G1Curve = group::G1Curve<PairingCurve>;
-
-/// alias to BLS12-381's G2 Group
-pub type G2Curve = group::G2Curve<PairingCurve>;
-
 #[derive(Clone, Debug)]
 pub struct PairingCurve;
 
 impl PC for PairingCurve {
     type Scalar = Scalar;
-
     type G1 = G1;
-
     type G2 = G2;
-
     type GT = Fq12;
 
     fn pair(a: &Self::G1, b: &Self::G2) -> Self::GT {
         Bls12::pairing(a.into_affine(), b.into_affine())
     }
 }
+
+pub type G1Curve = group::G1Curve<PairingCurve>;
+pub type G2Curve = group::G2Curve<PairingCurve>;
 
 #[cfg(test)]
 mod tests {
