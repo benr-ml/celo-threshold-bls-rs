@@ -1,11 +1,11 @@
-use crate::curve::group::{Curve, Element, Point, Scalar};
+use crate::curve::group::{Group, Element, Point, Scalar};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
 
-pub type PrivatePoly<C> = Poly<<C as Curve>::Scalar>;
-pub type PublicPoly<C> = Poly<<C as Curve>::Point>;
+pub type PrivatePoly<C> = Poly<<C as Group>::Scalar>;
+pub type PublicPoly<C> = Poly<<C as Group>::Point>;
 
 pub type Idx = u32;
 

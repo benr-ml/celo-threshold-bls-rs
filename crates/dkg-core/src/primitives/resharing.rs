@@ -6,7 +6,7 @@
 //! receives a refreshed share of the same secret).
 use super::common::*;
 use crate::primitives::{
-    group::Group,
+    group::NodesWithThreshold,
     phases::{Phase0, Phase1, Phase2, Phase3},
     status::{Status, StatusMatrix},
     types::*,
@@ -14,7 +14,7 @@ use crate::primitives::{
 };
 
 use threshold_bls::{
-    curve::group::{Curve, Element},
+    curve::group::{Group, Element},
     primitives::poly::{Eval, Idx, Poly, PrivatePoly, PublicPoly},
     sig::Share,
 };
@@ -25,13 +25,13 @@ use std::{cell::RefCell, fmt::Debug};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-struct ReshareInfo<C: Curve> {
+struct ReshareInfo<C: Group> {
     private_key: C::Scalar,
     public_key: C::Point,
     // our previous index in the group - it can be none if we are a new member
     prev_index: Option<Idx>,
     // previous group on which to reshare
-    prev_group: Group<C>,
+    prev_group: NodesWithThreshold<C>,
     // previous group distributed public polynomial
     prev_public: Poly<C::Point>,
     // secret and public polynomial of a dealer
@@ -41,10 +41,10 @@ struct ReshareInfo<C: Curve> {
     // our new index in the group - it can be none if we are a leaving member
     new_index: Option<Idx>,
     // new group that is receiving the refreshed shares
-    new_group: Group<C>,
+    new_group: NodesWithThreshold<C>,
 }
 
-impl<C: Curve> ReshareInfo<C> {
+impl<C: Group> ReshareInfo<C> {
     fn is_dealer(&self) -> bool {
         self.prev_index.is_some()
     }
@@ -63,15 +63,15 @@ impl<C: Curve> ReshareInfo<C> {
 /// receives a refreshed share of the same secret).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct RDKG<C: Curve> {
+pub struct RDKG<C: Group> {
     info: ReshareInfo<C>,
 }
 
-impl<C: Curve> RDKG<C> {
+impl<C: Group> RDKG<C> {
     pub fn new_from_share(
         private_key: C::Scalar,
         curr_share: DKGOutput<C>,
-        new_group: Group<C>,
+        new_group: NodesWithThreshold<C>,
     ) -> Result<RDKG<C>, DKGError> {
         use rand::prelude::*;
         Self::new_from_share_rng(private_key, curr_share, new_group, &mut thread_rng())
@@ -80,7 +80,7 @@ impl<C: Curve> RDKG<C> {
     pub fn new_from_share_rng<R: CryptoRng + RngCore>(
         private_key: C::Scalar,
         curr_share: DKGOutput<C>,
-        new_group: Group<C>,
+        new_group: NodesWithThreshold<C>,
         rng: &mut R,
     ) -> Result<RDKG<C>, DKGError> {
         let oldi = Some(curr_share.share.index);
@@ -110,9 +110,9 @@ impl<C: Curve> RDKG<C> {
 
     pub fn new_member(
         private_key: C::Scalar,
-        curr_group: Group<C>,
+        curr_group: NodesWithThreshold<C>,
         curr_public: PublicPoly<C>,
-        new_group: Group<C>,
+        new_group: NodesWithThreshold<C>,
     ) -> Result<RDKG<C>, DKGError> {
         let mut pubkey = C::point();
         pubkey.mul(&private_key);
@@ -132,7 +132,7 @@ impl<C: Curve> RDKG<C> {
     }
 }
 
-impl<C: Curve> Phase0<C> for RDKG<C> {
+impl<C: Group> Phase0<C> for RDKG<C> {
     type Next = RDKGWaitingShare<C>;
     fn encrypt_shares<R: CryptoRng + RngCore>(
         self,
@@ -167,11 +167,11 @@ impl<C: Curve> Phase0<C> for RDKG<C> {
 /// Resharing stage which waits to receive the shares from the previous phase's
 /// participants as input. After processing the share, if there were any
 /// complaints, it will generate a bundle of responses for the next phase.
-pub struct RDKGWaitingShare<C: Curve> {
+pub struct RDKGWaitingShare<C: Group> {
     info: ReshareInfo<C>,
 }
 
-impl<C: Curve> Phase1<C> for RDKGWaitingShare<C> {
+impl<C: Group> Phase1<C> for RDKGWaitingShare<C> {
     type Next = RDKGWaitingResponse<C>;
     #[allow(unused_assignments)]
     fn process_shares(
@@ -276,14 +276,14 @@ impl<C: Curve> Phase1<C> for RDKGWaitingShare<C> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct RDKGWaitingResponse<C: Curve> {
+pub struct RDKGWaitingResponse<C: Group> {
     info: ReshareInfo<C>,
     shares: ShareInfo<C>,
     publics: PublicInfo<C>,
     statuses: StatusMatrix,
 }
 
-impl<C: Curve> Phase2<C> for RDKGWaitingResponse<C> {
+impl<C: Group> Phase2<C> for RDKGWaitingResponse<C> {
     type Next = RDKGWaitingJustification<C>;
 
     #[allow(clippy::type_complexity)]
@@ -350,7 +350,7 @@ impl<C: Curve> Phase2<C> for RDKGWaitingResponse<C> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct RDKGWaitingJustification<C: Curve> {
+pub struct RDKGWaitingJustification<C: Group> {
     info: ReshareInfo<C>,
     shares: ShareInfo<C>,
     publics: PublicInfo<C>,
@@ -360,7 +360,7 @@ pub struct RDKGWaitingJustification<C: Curve> {
 
 impl<C> Phase3<C> for RDKGWaitingJustification<C>
 where
-    C: Curve,
+    C: Group,
 {
     /// Accept a justification if the following conditions are true:
     /// - bundle's dealer index is in range
@@ -421,7 +421,7 @@ where
     }
 }
 
-fn compute_resharing_output<C: Curve>(
+fn compute_resharing_output<C: Group>(
     info: ReshareInfo<C>,
     shares: ShareInfo<C>,
     publics: PublicInfo<C>,
@@ -487,7 +487,7 @@ fn compute_resharing_output<C: Curve>(
         })
         .collect::<Vec<_>>();
 
-    let qual_group = Group::<C>::new(qual, info.new_group.threshold)?;
+    let qual_group = NodesWithThreshold::<C>::new(qual, info.new_group.threshold)?;
     Ok(DKGOutput {
         qual: qual_group,
         public: recovered_public,
@@ -502,7 +502,7 @@ fn compute_resharing_output<C: Curve>(
 // share of the dealer,i.e. it's actually a resharing
 // if it returns false, we must set the dealer's shares as being complaint, all
 // of them since he is not respecting the protocol
-fn check_public_resharing<C: Curve>(
+fn check_public_resharing<C: Group>(
     dealer_idx: Idx,
     deal_poly: &PublicPoly<C>,
     group_poly: &PublicPoly<C>,
@@ -529,7 +529,7 @@ mod tests {
 
     use rand::prelude::*;
 
-    fn setup_reshare<C: Curve>(
+    fn setup_reshare<C: Group>(
         old_n: usize,
         old_thr: usize,
         new_n: usize,
@@ -555,7 +555,7 @@ mod tests {
 
         // create the new group
         let mut new_group = if new_n > 0 {
-            Group::from(
+            NodesWithThreshold::from(
                 prev_privs
                     .iter()
                     .chain(new_priv.as_ref().unwrap().iter())

@@ -5,14 +5,14 @@ use crate::primitives::{
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use threshold_bls::curve::group::Curve;
+use threshold_bls::curve::group::Group;
 
 use std::fmt::Debug;
 
 /// Phase0 is the trait abstracting the first step of a distributed key
 /// generation computation. At this stage, the "dealer" nodes create their
 /// shares and encrypt them to the "share holders".
-pub trait Phase0<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
+pub trait Phase0<C: Group>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
     type Next: Phase1<C>;
 
     fn encrypt_shares<R: CryptoRng + RngCore>(
@@ -24,7 +24,7 @@ pub trait Phase0<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> 
 /// Phase1 is the trait abstracting the second step of a distributed key
 /// generation computation. At this stage, the "share holders" nodes decrypt the
 /// shares and create responses to broadcast to both dealers and share holders.
-pub trait Phase1<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
+pub trait Phase1<C: Group>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
     type Next: Phase2<C>;
 
     fn process_shares(
@@ -43,7 +43,7 @@ pub trait Phase1<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> 
 /// be finished already. If not, the call returns an error which either contains
 /// the next phase and potential justifications or a fatal error that makes this
 /// node unable to continue participating in the protocol.
-pub trait Phase2<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
+pub trait Phase2<C: Group>: Clone + Debug + Serialize + for<'a> Deserialize<'a> {
     type Next: Phase3<C>;
 
     #[allow(clippy::type_complexity)]
@@ -56,7 +56,7 @@ pub trait Phase2<C: Curve>: Clone + Debug + Serialize + for<'a> Deserialize<'a> 
 /// Phase3 is the trait abstracting the final stage of a distributed key
 /// generation protocol. At this stage, the share holders process the potential
 /// justifications, and look if they can finish the protocol.
-pub trait Phase3<C: Curve>: Debug {
+pub trait Phase3<C: Group>: Debug {
     fn process_justifications(
         self,
         justifs: &[BundledJustification<C>],

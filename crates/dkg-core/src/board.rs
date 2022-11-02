@@ -6,14 +6,14 @@ use super::primitives::types::{BundledJustification, BundledResponses, BundledSh
 use async_trait::async_trait;
 use bincode::serialize_into;
 use std::io::Write;
-use threshold_bls::curve::group::Curve;
+use threshold_bls::curve::group::Group;
 
 /// Trait which must be implemented for writing to the board. This trait assumes
 /// an authenticated channel.
 #[async_trait(?Send)]
 pub trait BoardPublisher<C>
 where
-    C: Curve,
+    C: Group,
 {
     /// Error raised when trying to publish data to the board
     type Error;
@@ -41,7 +41,7 @@ where
 #[async_trait(?Send)]
 impl<C, W> BoardPublisher<C> for W
 where
-    C: Curve,
+    C: Group,
     W: Write,
 {
     /// Error raised when trying to publish data to the board

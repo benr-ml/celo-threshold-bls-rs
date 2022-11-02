@@ -3,7 +3,7 @@
 //! The protocol runs at minimum in two phases and at most in three phases.
 use super::common::*;
 use crate::primitives::{
-    group::Group,
+    group::NodesWithThreshold,
     phases::{Phase0, Phase1, Phase2, Phase3},
     status::{Status, StatusMatrix},
     types::*,
@@ -11,7 +11,7 @@ use crate::primitives::{
 };
 
 use threshold_bls::{
-    curve::group::{Curve, Element},
+    curve::group::{Group, Element},
     primitives::poly::{Idx, Poly, PrivatePoly, PublicPoly},
     sig::Share,
 };
@@ -22,16 +22,16 @@ use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-struct DKGInfo<C: Curve> {
+struct DKGInfo<C: Group> {
     private_key: C::Scalar,
     public_key: C::Point,
     index: Idx,
-    group: Group<C>,
+    group: NodesWithThreshold<C>,
     secret: Poly<C::Scalar>,
     public: Poly<C::Point>,
 }
 
-impl<C: Curve> DKGInfo<C> {
+impl<C: Group> DKGInfo<C> {
     /// Returns the number of nodes participating in the group for this DKG
     fn n(&self) -> usize {
         self.group.len()
@@ -53,16 +53,16 @@ impl<C: Curve> DKGInfo<C> {
 /// a new state that only accepts to transition to the next phase.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct DKG<C: Curve> {
+pub struct DKG<C: Group> {
     /// Metadata about the DKG
     info: DKGInfo<C>,
 }
 
-impl<C: Curve> DKG<C> {
+impl<C: Group> DKG<C> {
     /// Creates a new DKG instance from the provided private key and group.
     ///
     /// The private key must be part of the group, otherwise this will return an error.
-    pub fn new(private_key: C::Scalar, group: Group<C>) -> Result<DKG<C>, DKGError> {
+    pub fn new(private_key: C::Scalar, group: NodesWithThreshold<C>) -> Result<DKG<C>, DKGError> {
         use rand::prelude::*;
         Self::new_rand(private_key, group, &mut thread_rng())
     }
@@ -72,7 +72,7 @@ impl<C: Curve> DKG<C> {
     /// The private key must be part of the group, otherwise this will return an error.
     pub fn new_rand<R: CryptoRng + RngCore>(
         private_key: C::Scalar,
-        group: Group<C>,
+        group: NodesWithThreshold<C>,
         rng: &mut R,
     ) -> Result<DKG<C>, DKGError> {
         // get the public key
@@ -101,7 +101,7 @@ impl<C: Curve> DKG<C> {
     }
 }
 
-impl<C: Curve> Phase0<C> for DKG<C> {
+impl<C: Group> Phase0<C> for DKG<C> {
     type Next = DKGWaitingShare<C>;
     /// Evaluates the secret polynomial at the index of each DKG participant and encrypts
     /// the result with the corresponding public key. Returns the bundled encrypted shares
@@ -127,12 +127,12 @@ impl<C: Curve> Phase0<C> for DKG<C> {
 /// DKG Stage which waits to receive the shares from the previous phase's participants
 /// as input. After processing the shares, if there were any complaints it will generate
 /// a bundle of responses for the next phase.
-pub struct DKGWaitingShare<C: Curve> {
+pub struct DKGWaitingShare<C: Group> {
     /// Metadata about the DKG
     info: DKGInfo<C>,
 }
 
-impl<C: Curve> Phase1<C> for DKGWaitingShare<C> {
+impl<C: Group> Phase1<C> for DKGWaitingShare<C> {
     type Next = DKGWaitingResponse<C>;
     #[allow(unused_assignments)]
     /// Tries to decrypt the provided shares and calculate the secret key and the
@@ -198,7 +198,7 @@ impl<C: Curve> Phase1<C> for DKGWaitingShare<C> {
 /// DKG Stage which waits to receive the responses from the previous phase's participants
 /// as input. The responses will be processed and justifications may be generated as a byproduct
 /// if there are complaints.
-pub struct DKGWaitingResponse<C: Curve> {
+pub struct DKGWaitingResponse<C: Group> {
     info: DKGInfo<C>,
     dist_share: C::Scalar,
     dist_pub: PublicPoly<C>,
@@ -206,7 +206,7 @@ pub struct DKGWaitingResponse<C: Curve> {
     publics: PublicInfo<C>,
 }
 
-impl<C: Curve> DKGWaitingResponse<C> {
+impl<C: Group> DKGWaitingResponse<C> {
     fn new(
         info: DKGInfo<C>,
         dist_share: C::Scalar,
@@ -224,7 +224,7 @@ impl<C: Curve> DKGWaitingResponse<C> {
     }
 }
 
-impl<C: Curve> Phase2<C> for DKGWaitingResponse<C> {
+impl<C: Group> Phase2<C> for DKGWaitingResponse<C> {
     type Next = DKGWaitingJustification<C>;
     #[allow(clippy::type_complexity)]
     /// Checks if the responses when applied to the status matrix result in a
@@ -284,7 +284,7 @@ impl<C: Curve> Phase2<C> for DKGWaitingResponse<C> {
 #[serde(bound = "C::Scalar: DeserializeOwned")]
 /// DKG Stage which waits to receive the justifications from the previous phase's participants
 /// as input to produce either the final DKG Output, or an error.
-pub struct DKGWaitingJustification<C: Curve> {
+pub struct DKGWaitingJustification<C: Group> {
     // TODO: transform that into one info variable that gets default value for
     // missing parts depending in the round of the protocol.
     info: DKGInfo<C>,
@@ -297,7 +297,7 @@ pub struct DKGWaitingJustification<C: Curve> {
 
 impl<C> Phase3<C> for DKGWaitingJustification<C>
 where
-    C: Curve,
+    C: Group,
 {
     /// Accept a justification if the following conditions are true:
     /// - bundle's dealer index is in range
@@ -347,7 +347,7 @@ where
             .into_iter()
             .filter(|n| qual_indices.contains(&(n.id() as usize)))
             .collect();
-        let group = Group::<C>::new(qual_nodes, thr)?;
+        let group = NodesWithThreshold::<C>::new(qual_nodes, thr)?;
 
         // add all good shares and public poly together
         add_share.add(&self.dist_share);
@@ -378,7 +378,7 @@ pub mod tests {
     use serde::{de::DeserializeOwned, Serialize};
     use static_assertions::assert_impl_all;
 
-    assert_impl_all!(Group<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
+    assert_impl_all!(NodesWithThreshold<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
     assert_impl_all!(DKGInfo<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
     assert_impl_all!(DKG<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
     assert_impl_all!(EncryptedShare<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
@@ -386,7 +386,7 @@ pub mod tests {
     assert_impl_all!(DKGOutput<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
     assert_impl_all!(BundledJustification<BCurve>: Serialize, DeserializeOwned, Clone, Debug);
 
-    fn setup_dkg<C: Curve>(n: usize) -> Vec<DKG<C>> {
+    fn setup_dkg<C: Group>(n: usize) -> Vec<DKG<C>> {
         let (privs, group) = setup_group::<C>(n, default_threshold(n));
         privs
             .into_iter()

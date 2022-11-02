@@ -1,9 +1,9 @@
-use crate::primitives::{group::Group, status::Status};
+use crate::primitives::{group::NodesWithThreshold, status::Status};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use threshold_bls::{
-    curve::group::Curve,
+    curve::group::Group,
     primitives::ecies::EciesCipher,
     primitives::poly::{Idx, PublicPoly},
     sig::Share,
@@ -13,9 +13,9 @@ use threshold_bls::{
 /// successfully.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct DKGOutput<C: Curve> {
+pub struct DKGOutput<C: Group> {
     /// The list of nodes that successfully ran the protocol until the end
-    pub qual: Group<C>,
+    pub qual: NodesWithThreshold<C>,
     /// The distributed public key
     pub public: PublicPoly<C>,
     /// The private share which corresponds to the participant's index
@@ -26,7 +26,7 @@ pub struct DKGOutput<C: Curve> {
 /// phase of the protocol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct BundledShares<C: Curve> {
+pub struct BundledShares<C: Group> {
     /// The dealer's index
     pub dealer_idx: Idx,
     /// The encrypted shared created by the dealer
@@ -43,7 +43,7 @@ pub struct BundledShares<C: Curve> {
 /// the participant's private key.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct EncryptedShare<C: Curve> {
+pub struct EncryptedShare<C: Group> {
     /// The index of the participant this share belongs to
     pub share_idx: Idx,
     /// The ECIES encrypted share
@@ -67,7 +67,7 @@ pub struct BundledResponses {
 /// complaint, in plaintext.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct Justification<C: Curve> {
+pub struct Justification<C: Group> {
     /// The share holder's index
     pub share_idx: Idx,
     /// The plaintext share
@@ -78,7 +78,7 @@ pub struct Justification<C: Curve> {
 #[serde(bound = "C::Scalar: DeserializeOwned")]
 /// A BundledJustification is broadcast by a dealer and contains the justifications
 /// they have received along with their corresponding Public polynomial
-pub struct BundledJustification<C: Curve> {
+pub struct BundledJustification<C: Group> {
     /// The dealer's index
     pub dealer_idx: Idx,
     /// The justifications

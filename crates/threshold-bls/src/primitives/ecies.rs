@@ -9,14 +9,14 @@
 //! use threshold_bls::{
 //!     primitives::ecies::{encrypt, decrypt},
 //!     curve::bls12381::G2Curve,
-//!     curve::group::Curve,
+//!     curve::group::Group,
 //!     curve::group::Element,
 //!     };
 //!
 //! let message = b"hello";
 //! let rng = &mut rand::thread_rng();
-//! let secret_key = <G2Curve as Curve>::Scalar::rand(rng);
-//! let mut public_key = <G2Curve as Curve>::Point::one();
+//! let secret_key = <G2Curve as Group>::Scalar::rand(rng);
+//! let mut public_key = <G2Curve as Group>::Point::one();
 //! public_key.mul(&secret_key);
 //!
 //! // encrypt the message with the receiver's public key
@@ -28,7 +28,7 @@
 //! assert_eq!(&message[..], &cleartext[..]);
 //! ```
 
-use crate::curve::group::{Curve, Element};
+use crate::curve::group::{Group, Element};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +55,7 @@ const DOMAIN: [u8; 4] = [1, 9, 6, 9];
 /// An ECIES encrypted cipher. Contains the ciphertext's bytes as well as the
 /// ephemeral public key
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EciesCipher<C: Curve> {
+pub struct EciesCipher<C: Group> {
     /// The ciphertext which was encrypted
     aead: Vec<u8>,
     /// The ephemeral public key corresponding to the scalar which was used to
@@ -66,7 +66,7 @@ pub struct EciesCipher<C: Curve> {
 }
 
 /// Encrypts the message with a public key (curve point) and returns a ciphertext
-pub fn encrypt<C: Curve, R: CryptoRng + RngCore>(
+pub fn encrypt<C: Group, R: CryptoRng + RngCore>(
     to: &C::Point,
     msg: &[u8],
     rng: &mut R,
@@ -103,7 +103,7 @@ pub fn encrypt<C: Curve, R: CryptoRng + RngCore>(
 }
 
 /// Decrypts the message with a secret key (curve scalar) and returns the cleartext
-pub fn decrypt<C: Curve>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result<Vec<u8>, AError> {
+pub fn decrypt<C: Group>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result<Vec<u8>, AError> {
     // dh = private * (eph * G) = private * ephPublic
     let mut dh = cipher.ephemeral.clone();
     dh.mul(&private);
@@ -118,7 +118,7 @@ pub fn decrypt<C: Curve>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result
 }
 
 /// Derives an ephemeral key from the provided public key
-fn derive<C: Curve>(dh: &C::Point) -> [u8; KEY_LEN] {
+fn derive<C: Group>(dh: &C::Point) -> [u8; KEY_LEN] {
     let serialized = bincode::serialize(dh).expect("could not serialize element");
 
     // no salt is fine since we use ephemeral - static DH

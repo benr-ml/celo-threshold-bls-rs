@@ -3,6 +3,7 @@ use super::{
     primitives::{
         phases::{Phase0, Phase1, Phase2, Phase3},
         types::{BundledJustification, BundledResponses, BundledShares, DKGOutput},
+        group::NodesWithThreshold,
         DKGError,
     },
 };
@@ -10,7 +11,7 @@ use super::{
 use async_trait::async_trait;
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use threshold_bls::curve::group::Curve;
+use threshold_bls::curve::group::Group;
 
 #[derive(Debug, Error)]
 /// Error thrown while running the DKG or while publishing to the board
@@ -25,7 +26,7 @@ pub enum NodeError {
 
 /// Phase2 can either be successful or require going to Phase 3.
 #[derive(Clone, Debug)]
-pub enum Phase2Result<C: Curve, P: Phase3<C>> {
+pub enum Phase2Result<C: Group, P: Phase3<C>> {
     /// The final DKG output
     Output(DKGOutput<C>),
     /// Indicates that Phase 2 failed and that the protocol must proceed to Phase 3
@@ -36,7 +37,7 @@ type NodeResult<T> = std::result::Result<T, NodeError>;
 
 /// A DKG Phase.
 #[async_trait(?Send)]
-pub trait DKGPhase<C: Curve, B: BoardPublisher<C>, T> {
+pub trait DKGPhase<C: Group, B: BoardPublisher<C>, T> {
     /// The next DKG Phase
     type Next;
 
@@ -51,7 +52,7 @@ pub trait DKGPhase<C: Curve, B: BoardPublisher<C>, T> {
 #[async_trait(?Send)]
 impl<C, B, R, P> DKGPhase<C, B, &mut R> for P
 where
-    C: Curve,
+    C: Group,
     B: BoardPublisher<C>,
     R: CryptoRng + RngCore,
     P: Phase0<C>,
@@ -77,7 +78,7 @@ where
 #[async_trait(?Send)]
 impl<C, B, P> DKGPhase<C, B, &[BundledShares<C>]> for P
 where
-    C: Curve,
+    C: Group,
     B: BoardPublisher<C>,
     P: Phase1<C>,
 {
@@ -107,7 +108,7 @@ where
 #[async_trait(?Send)]
 impl<C, B, P> DKGPhase<C, B, &[BundledResponses]> for P
 where
-    C: Curve,
+    C: Group,
     B: BoardPublisher<C>,
     P: Phase2<C>,
 {
@@ -149,7 +150,7 @@ where
 #[async_trait(?Send)]
 impl<C, B, P> DKGPhase<C, B, &[BundledJustification<C>]> for P
 where
-    C: Curve,
+    C: Group,
     B: BoardPublisher<C>,
     P: Phase3<C>,
 {
@@ -172,7 +173,7 @@ mod tests {
     use super::*;
     use crate::{
         primitives::{
-            group::{Group, Node},
+            group::{NodesWithThreshold, Node},
             joint_feldman, resharing,
         },
         test_helpers::InMemoryBoard,
@@ -186,7 +187,7 @@ mod tests {
     };
     // helper to simulate a phase0 where a participant does not publish their
     // shares to the board
-    fn bad_phase0<C: Curve, R: CryptoRng + RngCore, P: Phase0<C>>(
+    fn bad_phase0<C: Group, R: CryptoRng + RngCore, P: Phase0<C>>(
         phase0: P,
         rng: &mut R,
     ) -> P::Next {
@@ -256,8 +257,8 @@ mod tests {
         t: usize,
         n: usize,
     ) where
-        C: Curve + PartialEq,
-        S: Scheme<Public = <C as Curve>::Point, Private = <C as Curve>::Scalar>,
+        C: Group + PartialEq,
+        S: Scheme<Public = <C as Group>::Point, Private = <C as Group>::Scalar>,
     {
         // 1. run the normal dkg
         let rng = &mut rand::thread_rng();
@@ -282,7 +283,7 @@ mod tests {
             .enumerate()
             .map(|(i, (_, public))| Node::<C>::new(i as Idx, public.clone()))
             .collect::<Vec<_>>();
-        let new_group = Group::new(nodes, new_t).unwrap();
+        let new_group = NodesWithThreshold::new(nodes, new_t).unwrap();
 
         let mut phase0s = Vec::new();
 
@@ -333,9 +334,9 @@ mod tests {
 
     async fn dkg_sign_e2e_curve<C, S>(n: usize, t: usize)
     where
-        C: Curve,
+        C: Group,
         // We need to bind the Curve's Point and Scalars to the Scheme
-        S: Scheme<Public = <C as Curve>::Point, Private = <C as Curve>::Scalar>
+        S: Scheme<Public = <C as Group>::Point, Private = <C as Group>::Scalar>
             + ThresholdScheme
             + SignatureScheme,
     {
@@ -369,7 +370,7 @@ mod tests {
         num_removed: usize, // the first `num_removed` results should be point to phase3 while the rest should be OK
     ) -> Vec<DKGOutput<C>>
     where
-        C: Curve,
+        C: Group,
         P: Phase0<C>,
         R: CryptoRng + RngCore,
     {
@@ -497,7 +498,7 @@ mod tests {
         bad: usize,
     ) -> Vec<DKGOutput<C>>
     where
-        C: Curve + PartialEq,
+        C: Group + PartialEq,
         P: Phase0<C>,
         R: CryptoRng + RngCore,
     {
@@ -563,9 +564,9 @@ mod tests {
         rng: &mut R,
     ) -> (InMemoryBoard<C>, Vec<joint_feldman::DKG<C>>)
     where
-        C: Curve,
+        C: Group,
         // We need to bind the Curve's Point and Scalars to the Scheme
-        S: Scheme<Public = <C as Curve>::Point, Private = <C as Curve>::Scalar>,
+        S: Scheme<Public = <C as Group>::Point, Private = <C as Group>::Scalar>,
     {
         // generate a keypair per participant
         let keypairs = (0..n).map(|_| S::keypair(rng)).collect::<Vec<_>>();
@@ -578,7 +579,7 @@ mod tests {
 
         // This is setup phase during which publickeys and indexes must be exchanged
         // across participants
-        let group = Group::new(nodes, t).unwrap();
+        let group = NodesWithThreshold::new(nodes, t).unwrap();
 
         // Create the Phase 0 for each participant
         let phase0s = keypairs

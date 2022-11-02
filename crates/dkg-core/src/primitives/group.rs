@@ -1,21 +1,21 @@
 use super::{default_threshold, minimum_threshold, DKGError, DKGResult};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use threshold_bls::{curve::group::Curve, primitives::poly::Idx};
+use threshold_bls::{curve::group::Group, primitives::poly::Idx};
 
 /// Node is a participant in the DKG protocol. In a DKG protocol, each
 /// participant must be identified both by an index and a public key. At the end
 /// of the protocol, if sucessful, the index is used to verify the validity of
 /// the share this node holds.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct Node<C: Curve>(Idx, C::Point);
+pub struct Node<C: Group>(Idx, C::Point);
 
-impl<C: Curve> Node<C> {
+impl<C: Group> Node<C> {
     pub fn new(index: Idx, public: C::Point) -> Self {
         Self(index, public)
     }
 }
 
-impl<C: Curve> Node<C> {
+impl<C: Group> Node<C> {
     /// Returns the node's index
     pub fn id(&self) -> Idx {
         self.0
@@ -34,19 +34,19 @@ impl<C: Curve> Node<C> {
 /// sets the threshold to the output of `default_threshold()`.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
-pub struct Group<C: Curve> {
+pub struct NodesWithThreshold<C: Group> {
     /// The vector of nodes in the group
     pub nodes: Vec<Node<C>>,
     /// The minimum number of nodes required to participate in the DKG for this group
     pub threshold: usize,
 }
 
-impl<C> Group<C>
+impl<C> NodesWithThreshold<C>
 where
-    C: Curve,
+    C: Group,
 {
     /// Converts a vector of nodes to a group with the default threshold (51%)
-    pub fn from_list(nodes: Vec<Node<C>>) -> Group<C> {
+    pub fn from_list(nodes: Vec<Node<C>>) -> NodesWithThreshold<C> {
         let l = nodes.len();
         Self {
             nodes,
@@ -57,7 +57,7 @@ where
     /// Creates a new group from the provided vector of nodes and threshold.
     ///
     /// Valid thresholds are `>= 51% * nodes.len()` and `<= 100% * nodes.len()`
-    pub fn new(nodes: Vec<Node<C>>, threshold: usize) -> DKGResult<Group<C>> {
+    pub fn new(nodes: Vec<Node<C>>, threshold: usize) -> DKGResult<NodesWithThreshold<C>> {
         let minimum = minimum_threshold(nodes.len());
         let maximum = nodes.len();
 
@@ -89,9 +89,9 @@ where
     }
 }
 
-impl<C> From<Vec<C::Point>> for Group<C>
+impl<C> From<Vec<C::Point>> for NodesWithThreshold<C>
 where
-    C: Curve,
+    C: Group,
 {
     fn from(list: Vec<C::Point>) -> Self {
         let thr = default_threshold(list.len());

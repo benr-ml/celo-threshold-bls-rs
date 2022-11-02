@@ -1,5 +1,5 @@
 use crate::primitives::{
-    group::Group,
+    group::NodesWithThreshold,
     status::{Status, StatusMatrix},
     types::*,
     DKGError, DKGResult, ShareError,
@@ -8,15 +8,15 @@ use crate::primitives::{
 use rand_core::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use threshold_bls::{
-    curve::group::{Curve, Element},
+    curve::group::{Group, Element},
     primitives::ecies,
     primitives::poly::{Idx, PrivatePoly, PublicPoly},
 };
 
-pub type ShareInfo<C> = HashMap<Idx, <C as Curve>::Scalar>;
+pub type ShareInfo<C> = HashMap<Idx, <C as Group>::Scalar>;
 pub type PublicInfo<C> = HashMap<Idx, PublicPoly<C>>;
 
-pub fn decrypt_and_check_share<C: Curve>(
+pub fn decrypt_and_check_share<C: Group>(
     private_key: &C::Scalar,
     own_idx: Idx,
     dealer_idx: Idx,
@@ -39,10 +39,10 @@ pub fn decrypt_and_check_share<C: Curve>(
 }
 
 /// set_statuses set the status of the given responses on the status matrix.
-pub fn set_statuses<C: Curve>(
+pub fn set_statuses<C: Group>(
     holder_idx: Idx,
-    dealers: &Group<C>,
-    holders: &Group<C>,
+    dealers: &NodesWithThreshold<C>,
+    holders: &NodesWithThreshold<C>,
     statuses: &mut StatusMatrix,
     responses: &[BundledResponses],
 ) {
@@ -68,7 +68,7 @@ pub fn set_statuses<C: Curve>(
 
 /// Checks if the commitment to the share corresponds to the public polynomial's
 /// evaluated at the given point.
-pub fn share_correct<C: Curve>(idx: Idx, share: &C::Scalar, public: &PublicPoly<C>) -> bool {
+pub fn share_correct<C: Group>(idx: Idx, share: &C::Scalar, public: &PublicPoly<C>) -> bool {
     let mut commit = C::Point::one();
     commit.mul(&share);
     let pub_eval = public.eval(idx);
@@ -77,11 +77,11 @@ pub fn share_correct<C: Curve>(idx: Idx, share: &C::Scalar, public: &PublicPoly<
 
 /// Creates the encrypted shares with the given secret polynomial to the given
 /// group.
-pub fn create_share_bundle<C: Curve, R: CryptoRng + RngCore>(
+pub fn create_share_bundle<C: Group, R: CryptoRng + RngCore>(
     dealer_idx: Idx,
     secret: &PrivatePoly<C>,
     public: &PublicPoly<C>,
-    group: &Group<C>,
+    group: &NodesWithThreshold<C>,
     rng: &mut R,
 ) -> DKGResult<BundledShares<C>> {
     let shares = group
@@ -157,9 +157,9 @@ pub fn compute_bundle_response(
 /// not good unless you hear otherwise.  - Broadcast only responses which
 /// are complaints: You assume that shares of other nodes are good unless
 /// you hear otherwise.
-pub fn process_shares_get_all<C: Curve>(
-    dealers: &Group<C>,
-    share_holders: &Group<C>,
+pub fn process_shares_get_all<C: Group>(
+    dealers: &NodesWithThreshold<C>,
+    share_holders: &NodesWithThreshold<C>,
     my_dealer_idx: Option<Idx>,
     my_idx: Idx,
     my_private: &C::Scalar,
@@ -221,7 +221,7 @@ pub fn process_shares_get_all<C: Curve>(
     Ok((valid_shares, publics, statuses))
 }
 
-pub fn get_justification<C: Curve>(
+pub fn get_justification<C: Group>(
     dealer_idx: Idx,
     secret: &PrivatePoly<C>,
     public: &PublicPoly<C>,
@@ -259,9 +259,9 @@ pub fn get_justification<C: Curve>(
 }
 
 /// returns the correct shares destined to the given holder index
-pub fn internal_process_justifications<C: Curve>(
+pub fn internal_process_justifications<C: Group>(
     holder_idx: Idx,
-    dealers: &Group<C>,
+    dealers: &NodesWithThreshold<C>,
     statuses: &mut StatusMatrix,
     publics: &PublicInfo<C>,
     justifs: &[BundledJustification<C>],
@@ -300,7 +300,7 @@ pub mod tests {
     use rand::thread_rng;
     use threshold_bls::primitives::poly::{Eval, Poly, PolyError};
 
-    fn reconstruct<C: Curve>(
+    fn reconstruct<C: Group>(
         thr: usize,
         shares: &[DKGOutput<C>],
     ) -> Result<PrivatePoly<C>, PolyError> {
@@ -314,7 +314,7 @@ pub mod tests {
         Poly::<C::Scalar>::full_recover(thr, evals)
     }
 
-    pub fn setup_group<C: Curve>(n: usize, thr: usize) -> (Vec<C::Scalar>, Group<C>) {
+    pub fn setup_group<C: Group>(n: usize, thr: usize) -> (Vec<C::Scalar>, NodesWithThreshold<C>) {
         let privs = (0..n)
             .map(|_| C::Scalar::rand(&mut thread_rng()))
             .collect::<Vec<_>>();
@@ -327,12 +327,12 @@ pub mod tests {
                 public
             })
             .collect();
-        let mut group = Group::from(pubs);
+        let mut group = NodesWithThreshold::from(pubs);
         group.threshold = thr;
         (privs, group)
     }
 
-    pub fn invalid2<C: Curve>(mut s: Vec<BundledShares<C>>) -> Vec<BundledShares<C>> {
+    pub fn invalid2<C: Group>(mut s: Vec<BundledShares<C>>) -> Vec<BundledShares<C>> {
         // modify a share
         s[0].shares[1].secret = ecies::encrypt(&C::point(), &[1], &mut thread_rng());
         s[3].shares[4].secret = ecies::encrypt(&C::point(), &[1], &mut thread_rng());
@@ -343,14 +343,14 @@ pub mod tests {
         r
     }
 
-    pub fn check2<C: Curve>(j: Vec<BundledJustification<C>>) -> Vec<BundledJustification<C>> {
+    pub fn check2<C: Group>(j: Vec<BundledJustification<C>>) -> Vec<BundledJustification<C>> {
         // there should be exactly 2 complaints, one for each bad share where
         // decryption failed
         assert_eq!(j.len(), 2);
         j
     }
 
-    pub fn id_out<C: Curve>(o: Vec<DKGOutput<C>>) -> Vec<DKGOutput<C>> {
+    pub fn id_out<C: Group>(o: Vec<DKGOutput<C>>) -> Vec<DKGOutput<C>> {
         o
     }
 
@@ -363,7 +363,7 @@ pub mod tests {
         map_out: impl Fn(Vec<DKGOutput<C>>) -> Vec<DKGOutput<C>>,
     ) -> DKGResult<PublicPoly<C>>
     where
-        C: Curve,
+        C: Group,
         P: Phase0<C>,
     {
         let n = dkgs.len();
@@ -434,7 +434,7 @@ pub mod tests {
 
     pub fn full_dkg<C, P>(nthr: usize, dkgs: Vec<P>) -> (Vec<DKGOutput<C>>, PublicPoly<C>)
     where
-        C: Curve,
+        C: Group,
         P: Phase0<C>,
     {
         let n = dkgs.len();
