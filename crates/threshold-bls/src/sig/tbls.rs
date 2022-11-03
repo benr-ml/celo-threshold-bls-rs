@@ -2,7 +2,6 @@
 //! [`SignatureScheme`](../trait.SignatureScheme.html)
 use crate::primitives::poly::{Eval, Idx, Poly, PolyError};
 use crate::sig::{Partial, SignatureScheme, ThresholdScheme};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -45,8 +44,8 @@ impl<I: SignatureScheme> ThresholdScheme for I {
     ) -> Result<Vec<u8>, <Self as ThresholdScheme>::Error> {
         let sig = Self::sign(&private.private, msg).map_err(ThresholdError::SignatureError)?;
         let partial = Eval {
-            value: sig,
             index: private.index,
+            value: sig,
         };
         let ret = bincode::serialize(&partial)?;
         Ok(ret)
@@ -58,9 +57,7 @@ impl<I: SignatureScheme> ThresholdScheme for I {
         partial: &[u8],
     ) -> Result<(), <Self as ThresholdScheme>::Error> {
         let partial: Eval<Vec<u8>> = bincode::deserialize(partial)?;
-
         let public_i = public.eval(partial.index);
-
         Self::verify(&public_i.value, msg, &partial.value).map_err(ThresholdError::SignatureError)
     }
 
@@ -87,7 +84,7 @@ impl<I: SignatureScheme> ThresholdScheme for I {
             })
             .collect::<Result<_, <Self as ThresholdScheme>::Error>>()?;
 
-        let recovered_sig = Poly::<Self::Signature>::recover(threshold, valid_partials)
+        let recovered_sig = Poly::<Self::Signature>::recover_c0(threshold, valid_partials)
             .map_err(ThresholdError::PolyError)?;
         Ok(bincode::serialize(&recovered_sig).expect("could not serialize"))
     }
@@ -101,88 +98,79 @@ use crate::{
     },
 };
 
-pub type ShareCreator<T> = fn(
-    usize,
-    usize,
-) -> (
-    Vec<Share<<T as Scheme>::Private>>,
-    Poly<<T as Scheme>::Public>,
-);
+pub mod test_utils {
+    use super::*;
+    use crate::primitives::poly::{Idx, Poly};
+    use crate::sig::{Partial, Scheme, Share, SignatureScheme, ThresholdScheme};
+    use crate::curve::group::Element;
 
-fn shares<T: ThresholdScheme>(n: usize, t: usize) -> (Vec<Share<T::Private>>, Poly<T::Public>) {
-    let private = Poly::<T::Private>::new(t - 1);
-    let shares = (0..n)
-        .map(|i| private.eval(i as Idx))
-        .map(|e| Share {
-            index: e.index,
-            private: e.value,
+    const msg: [u8; 4] = [1, 2, 3, 4];
+
+    pub fn create_vss_pk_and_shares<T: ThresholdScheme>(n: usize, t: usize) -> (Vec<Share<T::Private>>, Poly<T::Public>) {
+        let private = Poly::<T::Private>::new(t - 1);
+        let shares = (1..(n+1))
+            .map(|i| private.eval(i as Idx))
+            .map(|e| Share {
+                index: e.index,
+                private: e.value,
+            })
+            .collect();
+        (shares, private.commit())
+    }
+
+    pub fn check_shares<T: ThresholdScheme + SignatureScheme>(num_of_shares_to_check: usize, shares: &Vec<Share<T::Private>>, vss_public: &Poly<T::Public>) -> bool{
+        shares.iter().take(num_of_shares_to_check).all(|share| {
+            let mut commit = T::Public::one();
+            commit.mul(&share.private);
+            let pub_eval = vss_public.eval(share.index);
+            pub_eval.value == commit
         })
-        .collect();
-    (shares, private.commit())
-}
+    }
 
-fn test_threshold_scheme<T: ThresholdScheme + SignatureScheme>(
-    threshold: usize,
-    creator: ShareCreator<T>,
-) {
-    let (shares, public) = creator(threshold + 1, threshold);
-    let msg = vec![1, 9, 6, 9];
-
-    let partials: Vec<_> = shares
-        .iter()
-        .map(|s| T::partial_sign(s, &msg).unwrap())
-        .collect();
-
-    assert_eq!(
-        false,
-        partials
+    pub fn compute_partial_sigs<T: ThresholdScheme + SignatureScheme>(t: usize, shares: &Vec<Share<T::Private>>) -> Vec<Partial> {
+        shares
             .iter()
-            .any(|p| T::partial_verify(&public, &msg, &p).is_err())
-    );
-    let final_sig = T::aggregate(threshold, &partials).unwrap();
+            .take(t)
+            .map(|s| T::partial_sign(s, &msg).unwrap())
+            .collect()
+    }
 
-    T::verify(public.public_key(), &msg, &final_sig).unwrap();
+    pub fn process_partial_sigs<T: ThresholdScheme + SignatureScheme>(partials: &Vec<Partial>, vss_public: &Poly<T::Public>, to_verify: bool) -> bool {
+        if (to_verify) {
+            assert_eq!(
+                false,
+                partials
+                    .iter()
+                    .any(|p| T::partial_verify(&vss_public, &msg, &p).is_err())
+            );
+        }
+        let final_sig = T::aggregate(partials.len(), &partials).unwrap();
+        T::verify(vss_public.public_key(), &msg, &final_sig).is_ok()
+    }
+
+    pub fn test_threshold_scheme<T: ThresholdScheme + SignatureScheme>(n: usize, t: usize) {
+        // Checks are done on n shares, even though in practice t will be used.
+        let (shares, public) = create_vss_pk_and_shares::<T>(n, t);
+        assert_eq!(true, check_shares::<T>(n, &shares, &public));
+        let sigs = compute_partial_sigs::<T>(n, &shares);
+        assert_eq!(true, process_partial_sigs::<T>(&sigs, &public, true));
+    }
 }
 
-pub fn test_threshold_g1(t: usize) {
-    type S = G1Scheme<PCurve>;
-    test_threshold_scheme::<S>(t, shares::<S>);
-}
-
-#[cfg(feature = "bls12_381")]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::test_utils::*;
 
-    #[test]
-    fn threshold_g1_32() {
-        type S = G1Scheme<PCurve>;
-        test_threshold_scheme::<S>(32, shares::<S>);
-    }
-    #[test]
-    fn threshold_g1_64() {
-        type S = G1Scheme<PCurve>;
-        test_threshold_scheme::<S>(64, shares::<S>);
-    }
     #[test]
     fn threshold_g1_128() {
         type S = G1Scheme<PCurve>;
-        test_threshold_scheme::<S>(128, shares::<S>);
-    }
-    #[test]
-    fn threshold_g1_256() {
-        type S = G1Scheme<PCurve>;
-        test_threshold_scheme::<S>(256, shares::<S>);
-    }
-    #[test]
-    fn threshold_g1_512() {
-        type S = G1Scheme<PCurve>;
-        test_threshold_scheme::<S>(512, shares::<S>);
+        test_threshold_scheme::<S>(256, 128);
     }
 
     #[test]
     fn threshold_g2() {
         type S = G2Scheme<PCurve>;
-        test_threshold_scheme::<S>(100, shares::<S>);
+        test_threshold_scheme::<S>(256, 128);
     }
 }

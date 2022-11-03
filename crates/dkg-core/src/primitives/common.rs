@@ -128,7 +128,7 @@ pub fn compute_bundle_response(
         });
 
     let responses = if !publish_all {
-        // only get the complaints
+        // only return the complaints
         responses
             .filter(|r| !r.status.is_success())
             .collect::<Vec<_>>()
@@ -227,7 +227,7 @@ pub fn get_justification<C: Group>(
     public: &PublicPoly<C>,
     statuses: &StatusMatrix,
 ) -> Option<BundledJustification<C>> {
-    // If there were any complaints against our deal, then we should re-evaluate our
+    // If there were any complaints against our dealer, then we should re-evaluate our
     // secret polynomial at the indexes where the complaints were, and publish these
     // as justifications (i.e. indicating that we are still behaving correctly).
     if !statuses.all_true(dealer_idx) {
@@ -311,7 +311,7 @@ pub mod tests {
                 index: o.share.index,
             })
             .collect();
-        Poly::<C::Scalar>::full_recover(thr, evals)
+        Poly::<C::Scalar>::recover(thr, evals)
     }
 
     pub fn setup_group<C: Group>(n: usize, thr: usize) -> (Vec<C::Scalar>, NodesWithThreshold<C>) {

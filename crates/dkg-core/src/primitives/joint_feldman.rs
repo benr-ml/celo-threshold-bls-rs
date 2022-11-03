@@ -23,8 +23,8 @@ use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
 struct DKGInfo<C: Group> {
-    private_key: C::Scalar,
-    public_key: C::Point,
+    ecies_private_key: C::Scalar,
+    ecies_public_key: C::Point,
     index: Idx,
     group: NodesWithThreshold<C>,
     secret: Poly<C::Scalar>,
@@ -38,7 +38,7 @@ impl<C: Group> DKGInfo<C> {
     }
 
     /// Returns the threshold of the group for this DKG
-    fn thr(&self) -> usize {
+    fn threshold(&self) -> usize {
         self.group.threshold
     }
 }
@@ -89,8 +89,8 @@ impl<C: Group> DKG<C> {
         let public = secret.commit::<C::Point>();
 
         let info = DKGInfo {
-            private_key,
-            public_key,
+            ecies_private_key: private_key,
+            ecies_public_key: public_key,
             index,
             group,
             secret,
@@ -152,14 +152,14 @@ impl<C: Group> Phase1<C> for DKGWaitingShare<C> {
         mut publish_all: bool,
     ) -> DKGResult<(DKGWaitingResponse<C>, Option<BundledResponses>)> {
         publish_all = false;
-        let thr = self.info.thr();
+        let thr = self.info.threshold();
         let my_idx = self.info.index;
         let (shares, publics, mut statuses) = process_shares_get_all(
             &self.info.group,
             &self.info.group,
             Some(my_idx),
             my_idx,
-            &self.info.private_key,
+            &self.info.ecies_private_key,
             bundles,
         )?;
 

@@ -2,7 +2,8 @@ use crate::primitives::{
     types::{BundledJustification, BundledResponses, BundledShares, DKGOutput},
     DKGError, DKGResult,
 };
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore}
+;
 use serde::{Deserialize, Serialize};
 
 use threshold_bls::curve::group::Group;

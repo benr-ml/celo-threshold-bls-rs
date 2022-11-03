@@ -13,8 +13,6 @@ pub(crate) mod status;
 
 pub mod joint_feldman;
 
-pub mod resharing;
-
 mod common;
 
 mod errors;

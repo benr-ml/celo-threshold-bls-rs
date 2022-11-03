@@ -19,26 +19,24 @@ pub trait Scheme: Debug {
     /// `Public` represents the group over which the public keys are
     /// represented.
     type Public: Point<RHS = Self::Private> + Serialize + DeserializeOwned;
-    /// `Signature` represents the group over which the signatures are reresented.
+    /// `Signature` represents the group over which the signatures are represented (not relevant to
+    /// all signature schemes).
     type Signature: Point<RHS = Self::Private> + Serialize + DeserializeOwned;
 
     /// Returns a new fresh keypair usable by the scheme.
     fn keypair<R: CryptoRng + RngCore>(rng: &mut R) -> (Self::Private, Self::Public) {
         let private = Self::Private::rand(rng);
-
         let mut public = Self::Public::one();
         public.mul(&private);
-
         (private, public)
     }
 }
 
-/// SignatureScheme is the trait that defines the operations of a sinature
+/// SignatureScheme is the trait that defines the operations of a signature
 /// scheme, namely `sign` and `verify`. Below is an example of using the
 /// signature scheme based on BLS, using the BLS12-381 curves.
 ///
 /// ```
-///  # #[cfg(feature = "bls12_381")]
 ///  # {
 ///  use rand::prelude::*;
 ///  use threshold_bls::{sig::{SignatureScheme, Scheme, G2Scheme}, curve::group::{Element, Point}};
@@ -62,6 +60,7 @@ pub trait SignatureScheme: Scheme {
     fn sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
     /// Verifies that the signature on the provided message was produced by the public key
+    /// TODO: return a bool
     fn verify(public: &Self::Public, msg: &[u8], sig: &[u8]) -> Result<(), Self::Error>;
 }
 
@@ -76,11 +75,13 @@ pub type Partial = Vec<u8>;
 pub trait ThresholdScheme: Scheme {
     /// Error produced when partially signing, aggregating or verifying
     type Error: Error;
+    // TODO: define a types for Poly<Self::Public>.
 
     /// Partially signs a message with a share of the private key
     fn partial_sign(private: &Share<Self::Private>, msg: &[u8]) -> Result<Partial, Self::Error>;
 
     /// Verifies a partial signature on a message against the public polynomial
+    /// TODO: return a bool
     fn partial_verify(
         public: &Poly<Self::Public>,
         msg: &[u8],

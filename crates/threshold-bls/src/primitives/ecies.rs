@@ -50,7 +50,7 @@ const NONCE_LEN: usize = 12;
 const KEY_LEN: usize = 32;
 
 /// A domain separator
-const DOMAIN: [u8; 4] = [1, 9, 6, 9];
+const DOMAIN: &str = "ecies:";
 
 /// An ECIES encrypted cipher. Contains the ciphertext's bytes as well as the
 /// ephemeral public key
@@ -61,43 +61,36 @@ pub struct EciesCipher<C: Group> {
     /// The ephemeral public key corresponding to the scalar which was used to
     /// encrypt the plaintext
     ephemeral: C::Point,
-    /// The nonce used to encrypt the ciphertext
-    nonce: [u8; NONCE_LEN],
 }
 
 /// Encrypts the message with a public key (curve point) and returns a ciphertext
 pub fn encrypt<C: Group, R: CryptoRng + RngCore>(
-    to: &C::Point,
+    pk: &C::Point,
     msg: &[u8],
     rng: &mut R,
 ) -> EciesCipher<C> {
     let eph_secret = C::Scalar::rand(rng);
-
     let mut ephemeral = C::Point::one();
     ephemeral.mul(&eph_secret);
 
     // dh = eph(yG) = eph * public
-    let mut dh = to.clone();
+    let mut dh = pk.clone();
     dh.mul(&eph_secret);
 
     // derive an ephemeral key from the public key
     let ephemeral_key = derive::<C>(&dh);
 
-    // generate a random nonce
-    let mut nonce: [u8; NONCE_LEN] = [0u8; NONCE_LEN];
-    rng.fill_bytes(&mut nonce);
-    let nonce_obj = Nonce::from_slice(&nonce);
+    // since ECIES uses different key per messages, the nonce can be fixed.
+    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LEN]);
 
     // instantiate the AEAD scheme
     let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
-
     let aead = aead
         .encrypt(&nonce_obj, &msg[..])
         .expect("aead should not fail");
 
     EciesCipher {
         aead,
-        nonce,
         ephemeral,
     }
 }
@@ -112,7 +105,7 @@ pub fn decrypt<C: Group>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result
 
     let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
 
-    let nonce_obj = Nonce::from_slice(&cipher.nonce);
+    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LEN]);
 
     aead.decrypt(&nonce_obj, &cipher.aead[..])
 }
@@ -121,10 +114,9 @@ pub fn decrypt<C: Group>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result
 fn derive<C: Group>(dh: &C::Point) -> [u8; KEY_LEN] {
     let serialized = bincode::serialize(dh).expect("could not serialize element");
 
-    // no salt is fine since we use ephemeral - static DH
     let h = Hkdf::<Sha256>::new(None, &serialized);
     let mut ephemeral_key = [0u8; KEY_LEN];
-    h.expand(&DOMAIN, &mut ephemeral_key)
+    h.expand(DOMAIN.as_bytes(), &mut ephemeral_key)
         .expect("hkdf should not fail");
 
     debug_assert!(ephemeral_key.len() == KEY_LEN);
@@ -132,7 +124,6 @@ fn derive<C: Group>(dh: &C::Point) -> [u8; KEY_LEN] {
     ephemeral_key
 }
 
-#[cfg(feature = "bls12_381")]
 #[cfg(test)]
 mod tests {
     use super::*;

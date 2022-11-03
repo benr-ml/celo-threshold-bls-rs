@@ -2,7 +2,7 @@ mod bls;
 pub use bls::{BLSError, G1Scheme, G2Scheme};
 
 mod tbls;
-pub use tbls::{test_threshold_g1, Share, ThresholdError};
+pub use tbls::{Share, ThresholdError, test_utils};
 
 #[allow(clippy::module_inception)]
 mod sig;
