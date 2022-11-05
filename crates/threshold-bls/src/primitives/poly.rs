@@ -111,8 +111,9 @@ where
     C::RHS: Scalar<RHS = C::RHS>,
 {
     /// Evaluates the polynomial at the specified value.
-    /// TODO: handle i=0
     pub fn eval(&self, i: Idx) -> Eval<C> {
+        assert!(i > 0); // Never reveal the secret coefficient directly.
+
         let mut xi = C::RHS::new();
         xi.set_int(i.into());
 
@@ -459,7 +460,7 @@ pub mod tests {
     }
 
     #[test]
-    fn eval(d in 0..100usize, idx in 0..(100 as Idx)) {
+    fn eval(d in 0..100usize, idx in 1..(100 as Idx)) {
         let mut x = Sc::new();
         x.set_int(idx as u64);
 
@@ -497,7 +498,7 @@ pub mod tests {
         let poly = Poly::<Sc>::new(degree);
 
         // insufficient shares gathered
-        let shares = (0..threshold - 1)
+        let shares = (1..threshold)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<_>>();
 
@@ -511,7 +512,7 @@ pub mod tests {
         let degree = 49;
         let threshold = degree + 1;
         let poly = Poly::<Sc>::new(degree);
-        let shares = (0..threshold)
+        let shares = (1..threshold+1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
         let now = SystemTime::now();
@@ -520,7 +521,7 @@ pub mod tests {
             Ok(e) => println!("single recover: time elapsed {:?}", e),
             Err(e) => panic!("{}", e),
         }
-        let shares = (0..threshold)
+        let shares = (1..threshold+1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
 

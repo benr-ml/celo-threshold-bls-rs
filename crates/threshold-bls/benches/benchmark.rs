@@ -7,9 +7,9 @@ use threshold_bls::sig::{G2Scheme, Share, SignatureScheme, ThresholdScheme};
 use curve::bls12381::PairingCurve;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    const sizes: [usize; 6] = [64, 128, 256, 440, 512, 1024];
+    const SIZES: [usize; 6] = [64, 128, 256, 440, 512, 1024];
     type S = G2Scheme<PairingCurve>;
-    for n in sizes {
+    for n in SIZES {
         let t = n / 2;
         c.bench_function(format!("create vss {} {}", n, t).as_str(), |b| {
             b.iter(|| create_vss_pk_and_shares::<S>(n, t))
