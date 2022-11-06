@@ -28,7 +28,7 @@
 //! assert_eq!(&message[..], &cleartext[..]);
 //! ```
 
-use crate::curve::group::{Group, Element};
+use crate::curve::group::{Element, Group};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -43,24 +43,27 @@ use sha2::Sha256;
 // re-export for usage by dkg primitives
 pub use chacha20poly1305::aead::Error as EciesError;
 
-/// The nonce length
-const NONCE_LEN: usize = 12;
-
-/// The ephemeral key length
-const KEY_LEN: usize = 32;
+const NONCE_LENGTH: usize = 12;
+const EPHEMERAL_KEY_LENGTH: usize = 32;
 
 /// A domain separator
 const DOMAIN: &str = "ecies:";
 
-/// An ECIES encrypted cipher. Contains the ciphertext's bytes as well as the
-/// ephemeral public key
+/// An ECIES encrypted cipher. Contains the ciphertext's bytes and the ephemeral public key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EciesCipher<C: Group> {
-    /// The ciphertext which was encrypted
     aead: Vec<u8>,
-    /// The ephemeral public key corresponding to the scalar which was used to
-    /// encrypt the plaintext
     ephemeral: C::Point,
+}
+
+// A key that allows decrypting a specific EciesCipher along with a proof of correctness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EciesDelegatedKey<C: Group> {
+    // The encryption's key that can be used to decrypt the message.
+    key: C::Point,
+    // Proof that it is indeed the right element.
+    // TODO: verify it's a secure ZK in the groups we work with.
+    proof: (C::Point, C::Point, C::Scalar),
 }
 
 /// Encrypts the message with a public key (curve point) and returns a ciphertext
@@ -72,55 +75,108 @@ pub fn encrypt<C: Group, R: CryptoRng + RngCore>(
     let eph_secret = C::Scalar::rand(rng);
     let mut ephemeral = C::Point::one();
     ephemeral.mul(&eph_secret);
-
     // dh = eph(yG) = eph * public
     let mut dh = pk.clone();
     dh.mul(&eph_secret);
-
     // derive an ephemeral key from the public key
     let ephemeral_key = derive::<C>(&dh);
-
     // since ECIES uses different key per messages, the nonce can be fixed.
-    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LEN]);
-
+    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LENGTH]);
     // instantiate the AEAD scheme
     let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
     let aead = aead
         .encrypt(&nonce_obj, &msg[..])
         .expect("aead should not fail");
-
-    EciesCipher {
-        aead,
-        ephemeral,
-    }
+    EciesCipher { aead, ephemeral }
 }
 
 /// Decrypts the message with a secret key (curve scalar) and returns the cleartext
-pub fn decrypt<C: Group>(private: &C::Scalar, cipher: &EciesCipher<C>) -> Result<Vec<u8>, AError> {
+pub fn decrypt<C: Group>(sk: &C::Scalar, cipher: &EciesCipher<C>) -> Result<Vec<u8>, AError> {
     // dh = private * (eph * G) = private * ephPublic
     let mut dh = cipher.ephemeral.clone();
-    dh.mul(&private);
-
+    dh.mul(&sk);
     let ephemeral_key = derive::<C>(&dh);
 
     let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
-
-    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LEN]);
-
+    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LENGTH]);
     aead.decrypt(&nonce_obj, &cipher.aead[..])
 }
 
-/// Derives an ephemeral key from the provided public key
-fn derive<C: Group>(dh: &C::Point) -> [u8; KEY_LEN] {
-    let serialized = bincode::serialize(dh).expect("could not serialize element");
+/// Generate an ephemeral key & NIZPoK for the given encryption.
+pub fn create_delegated_key<C: Group, R: CryptoRng + RngCore>(
+    sk: &C::Scalar,
+    cipher: &EciesCipher<C>,
+    rng: &mut R,
+) -> EciesDelegatedKey<C> {
+    // the full ephemeral key.
+    let mut key = cipher.ephemeral.clone();
+    key.mul(&sk);
 
+    // NIZKPoK for the DDH tuple [G, ephemeral=zG, pk=sk G, key=sk zG]
+    let r = C::Scalar::rand(rng);
+    let mut rG = C::Point::one();
+    rG.mul(&r);
+    let mut rH = cipher.ephemeral.clone();
+    rH.mul(&r);
+
+    // TODO: Derive from a RO for a unique metadata.
+    let challenge = C::Scalar::one();
+    let mut z = challenge.clone();
+    z.mul(sk);
+    z.add(&r);
+
+    EciesDelegatedKey {
+        key,
+        proof: (rG, rH, z),
+    }
+}
+
+pub fn decrypt_with_delegated_key<C: Group>(
+    delegated_key: &EciesDelegatedKey<C>,
+    cipher: &EciesCipher<C>,
+    pk: &C::Point,
+) -> Result<Vec<u8>, AError> {
+    // Verify the NIZK proof.
+    // TODO: Derive from a RO for a unique metadata.
+    let challenge = C::Scalar::one();
+    if !is_valid_relation::<C>(
+        &delegated_key.proof.0,
+        pk,
+        &delegated_key.proof.2,
+        &challenge,
+    ) || !is_valid_relation::<C>(
+        &delegated_key.proof.1,
+        &delegated_key.key,
+        &delegated_key.proof.2,
+        &challenge,
+    ) {
+        return Err(AError);
+    }
+
+    let ephemeral_key = derive::<C>(&delegated_key.key);
+    let aead = ChaCha20Poly1305::new_from_slice(&ephemeral_key).unwrap();
+    let nonce_obj = Nonce::from_slice(&[0u8; NONCE_LENGTH]);
+    aead.decrypt(&nonce_obj, &cipher.aead[..])
+}
+
+/// Checks if zG = e1 + e2*c.
+fn is_valid_relation<C: Group>(e1: &C::Point, e2: &C::Point, z: &C::Scalar, c: &C::Scalar) -> bool {
+    let mut expected_zG = e2.clone();
+    expected_zG.mul(c);
+    expected_zG.add(&e1);
+    let mut zG = C::Point::one();
+    zG.mul(&z);
+    zG == expected_zG
+}
+
+/// Derives an ephemeral key from the provided public key.
+fn derive<C: Group>(dh: &C::Point) -> [u8; EPHEMERAL_KEY_LENGTH] {
+    let serialized = bincode::serialize(dh).expect("could not serialize element");
     let h = Hkdf::<Sha256>::new(None, &serialized);
-    let mut ephemeral_key = [0u8; KEY_LEN];
+    let mut ephemeral_key = [0u8; EPHEMERAL_KEY_LENGTH];
     h.expand(DOMAIN.as_bytes(), &mut ephemeral_key)
         .expect("hkdf should not fail");
-
-    debug_assert!(ephemeral_key.len() == KEY_LEN);
-
+    debug_assert!(ephemeral_key.len() == EPHEMERAL_KEY_LENGTH);
     ephemeral_key
 }
 

@@ -46,11 +46,8 @@ pub trait Scalar: Element {
 
 /// Basic point functionality that can be multiplied by a scalar
 pub trait Point: Element {
-    /// Error which may occur while mapping to the group
-    type Error: Debug;
-
     /// Maps the provided data to a group element
-    fn map(&mut self, data: &[u8]) -> Result<(), <Self as Point>::Error>;
+    fn map(&mut self, data: &[u8]);
 }
 
 /// A group holds functionalities to create scalar and points related; it is
@@ -76,11 +73,8 @@ pub trait Group: Clone + Debug + Send + Sync {
 /// A curve equipped with a bilinear pairing operation.
 pub trait PairingCurve: Debug {
     type Scalar: Scalar<RHS = Self::Scalar>;
-
     type G1: Point<RHS = Self::Scalar>;
-
     type G2: Point<RHS = Self::Scalar>;
-
     type GT: Element;
 
     /// Performs a pairing operation between the 2 group elements

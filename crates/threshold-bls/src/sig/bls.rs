@@ -29,12 +29,9 @@ pub mod common {
     /// BLS signature over G1 or G2.
     pub trait BLSScheme: Scheme {
         /// Returns sig = msg^{private}. The message MUST be hashed before this call.
-        fn internal_sign(
-            private: &Self::Private,
-            msg: &[u8],
-        ) -> Result<Vec<u8>, BLSError> {
+        fn internal_sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, BLSError> {
             let mut h = Self::Signature::new();
-            h.map(msg).map_err(|_| BLSError::HashingError)?;
+            h.map(msg);
             h.mul(private);
             let serialized = bincode::serialize(&h)?;
             Ok(serialized)
@@ -47,7 +44,7 @@ pub mod common {
         ) -> Result<(), BLSError> {
             let sig: Self::Signature = bincode::deserialize_from(sig_bytes)?;
             let mut h = Self::Signature::new();
-            h.map(msg).map_err(|_| BLSError::HashingError)?;
+            h.map(msg);
             let success = Self::verify_pairings(public, &sig, &h);
             if !success {
                 return Err(BLSError::InvalidSig);

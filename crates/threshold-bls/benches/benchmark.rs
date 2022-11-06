@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use curve::bls12381::PairingCurve;
 use std::time::Duration;
 use threshold_bls::curve;
 use threshold_bls::primitives::poly::{Idx, Poly};
 use threshold_bls::sig::test_utils::*;
 use threshold_bls::sig::{G2Scheme, Share, SignatureScheme, ThresholdScheme};
-use curve::bls12381::PairingCurve;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     const SIZES: [usize; 6] = [64, 128, 256, 440, 512, 1024];
@@ -25,11 +25,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(format!("process sigs w/o verf {} {}", n, t).as_str(), |b| {
             b.iter(|| process_partial_sigs::<S>(&sigs, &public, false))
         });
-        c.bench_function(format!("process sigs with verf {} {}", n, t).as_str(), |b| {
-            b.iter(|| process_partial_sigs::<S>(&sigs, &public, true))
-        });
+        c.bench_function(
+            format!("process sigs with verf {} {}", n, t).as_str(),
+            |b| b.iter(|| process_partial_sigs::<S>(&sigs, &public, true)),
+        );
     }
-
 }
 
 criterion_group! {

@@ -4,25 +4,11 @@ use groupy::CurveProjective;
 use paired::bls12_381::{Bls12, Fq12, Fr, FrRepr, G1 as PG1, G2 as PG2};
 use paired::Engine;
 use rand_core::{CryptoRng, RngCore};
-use std::result::Result;
-use thiserror::Error;
 
 pub type Scalar = Fr;
 pub type G1 = PG1;
 pub type G2 = PG2;
 pub type GT = Fq12;
-
-#[derive(Debug, Error)]
-pub enum BellmanError {
-    #[error("decoding: invalid length {0}/{1}")]
-    InvalidLength(usize, usize),
-    #[error("IO Error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Field Decoding Error: {0}")]
-    PrimeFieldDecodingError(#[from] ff::PrimeFieldDecodingError),
-    #[error("Group Decoding Error: {0}")]
-    GroupDecodingError(#[from] groupy::GroupDecodingError),
-}
 
 /// Implementation of Scalar using field elements used in BLS12-381
 impl Sc for Scalar {
@@ -73,11 +59,15 @@ impl Element for G1 {
     fn one() -> Self {
         groupy::CurveProjective::one()
     }
-    fn add(&mut self, s2: &Self) { self.add_assign(s2); }
+    fn add(&mut self, s2: &Self) {
+        self.add_assign(s2);
+    }
     fn mul(&mut self, mul: &Scalar) {
         self.mul_assign(FrRepr::from(*mul))
     }
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self { G1::random(rng) }
+    fn rand<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        G1::random(rng)
+    }
 }
 
 impl Element for G2 {
@@ -122,21 +112,15 @@ impl Element for GT {
 
 /// Implementation of Point using G1 from BLS12-381
 impl Point for G1 {
-    type Error = ();
-
-    fn map(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn map(&mut self, data: &[u8]) {
         *self = G1::hash(data);
-        Ok(())
     }
 }
 
 /// Implementation of Point using G2 from BLS12-381
 impl Point for G2 {
-    type Error = ();
-
-    fn map(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn map(&mut self, data: &[u8]) {
         *self = G2::hash(data);
-        Ok(())
     }
 }
 

@@ -1,12 +1,9 @@
+use crate::primitives::{ecies::EciesError, poly, poly::Idx};
 use thiserror::Error;
-use threshold_bls::primitives::{ecies::EciesError, poly, poly::Idx};
-
-/// Result type alias which returns `DKGError`
-pub type DKGResult<A> = Result<A, DKGError>;
 
 #[derive(Debug, Error)]
 /// Errors which may occur during the DKG
-pub enum DKGError {
+pub enum DkgError {
     /// PublicKeyNotFound is raised when the private key given to the DKG init
     /// function does not yield a public key that is included in the group.
     #[error("public key not found in list of participants")]
@@ -19,14 +16,9 @@ pub enum DKGError {
     #[error("threshold {0} is not in range [{1},{2}]")]
     InvalidThreshold(usize, usize, usize),
 
-    /// NotEnoughValidShares is raised when the DKG has not successfully
-    /// processed enough shares because they were invalid. In that case, the DKG
-    /// can not continue, the protocol MUST be aborted.
-    #[error("only has {0}/{1} valid shares")]
-    NotEnoughValidShares(usize, usize),
-
-    #[error("only has {0}/{1} required justifications")]
-    NotEnoughJustifications(usize, usize),
+    /// InvalidNumberOfMessages is raised when the DKG has not received t messages.
+    #[error("expecting {0} messages")]
+    InvalidNumberOfMessages(usize),
 
     /// Rejected is raised when the participant is rejected from the final
     /// output
@@ -36,10 +28,6 @@ pub enum DKGError {
     /// BincodeError is raised when de(serialization) by bincode fails
     #[error("de(serialization failed: {0})")]
     BincodeError(#[from] bincode::Error),
-
-    /// ShareError is raised when a share is being processed
-    #[error(transparent)]
-    ShareError(#[from] ShareError),
 
     /// NotDealer is raised when one attempts to call a method of a
     /// dealer during a resharing when it is not a member of the current group.
@@ -54,12 +42,7 @@ pub enum DKGError {
 
     #[error("invalid recovery during resharing: {0}")]
     InvalidRecovery(#[from] poly::PolyError),
-}
 
-#[derive(Debug, Error)]
-#[allow(clippy::enum_variant_names)]
-/// Error which may occur while processing a share in Phase 1
-pub enum ShareError {
     /// InvalidCipherText returns the error raised when decrypting the encrypted
     /// share.
     #[error("[dealer: {0}] Invalid ciphertext")]

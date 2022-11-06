@@ -92,23 +92,27 @@ impl<I: SignatureScheme> ThresholdScheme for I {
 
 use crate::{
     curve::bls12381::PairingCurve as PCurve,
-    sig::{
-        bls::{G1Scheme, G2Scheme},
-        Scheme,
-    },
+    sig::bls::{G1Scheme, G2Scheme},
 };
 
 pub mod test_utils {
-    use super::*;
-    use crate::primitives::poly::{Idx, Poly};
-    use crate::sig::{Partial, Scheme, Share, SignatureScheme, ThresholdScheme};
     use crate::curve::group::Element;
+    use crate::primitives::poly::{Idx, Poly};
+    use crate::sig::{Partial, Share, SignatureScheme, ThresholdScheme};
 
-    const msg: [u8; 4] = [1, 2, 3, 4];
+    const MSG: [u8; 4] = [1, 2, 3, 4];
 
-    pub fn create_vss_pk_and_shares<T: ThresholdScheme>(n: usize, t: usize) -> (Vec<Share<T::Private>>, Poly<T::Public>) {
+    /// extract to dkg lib, and add
+    /// - ecies key gen and encryptions
+    /// - nizkpok of ecies key, and of first coefficient
+    /// - nizkpok in case of frauds
+    ///
+    pub fn create_vss_pk_and_shares<T: ThresholdScheme>(
+        n: usize,
+        t: usize,
+    ) -> (Vec<Share<T::Private>>, Poly<T::Public>) {
         let private = Poly::<T::Private>::new(t - 1);
-        let shares = (1..(n+1))
+        let shares = (1..(n + 1))
             .map(|i| private.eval(i as Idx))
             .map(|e| Share {
                 index: e.index,
@@ -118,7 +122,11 @@ pub mod test_utils {
         (shares, private.commit())
     }
 
-    pub fn check_shares<T: ThresholdScheme + SignatureScheme>(num_of_shares_to_check: usize, shares: &Vec<Share<T::Private>>, vss_public: &Poly<T::Public>) -> bool{
+    pub fn check_shares<T: ThresholdScheme + SignatureScheme>(
+        num_of_shares_to_check: usize,
+        shares: &Vec<Share<T::Private>>,
+        vss_public: &Poly<T::Public>,
+    ) -> bool {
         shares.iter().take(num_of_shares_to_check).all(|share| {
             let mut commit = T::Public::one();
             commit.mul(&share.private);
@@ -127,25 +135,32 @@ pub mod test_utils {
         })
     }
 
-    pub fn compute_partial_sigs<T: ThresholdScheme + SignatureScheme>(t: usize, shares: &Vec<Share<T::Private>>) -> Vec<Partial> {
+    pub fn compute_partial_sigs<T: ThresholdScheme + SignatureScheme>(
+        t: usize,
+        shares: &Vec<Share<T::Private>>,
+    ) -> Vec<Partial> {
         shares
             .iter()
             .take(t)
-            .map(|s| T::partial_sign(s, &msg).unwrap())
+            .map(|s| T::partial_sign(s, &MSG).unwrap())
             .collect()
     }
 
-    pub fn process_partial_sigs<T: ThresholdScheme + SignatureScheme>(partials: &Vec<Partial>, vss_public: &Poly<T::Public>, to_verify: bool) -> bool {
-        if (to_verify) {
+    pub fn process_partial_sigs<T: ThresholdScheme + SignatureScheme>(
+        partials: &Vec<Partial>,
+        vss_public: &Poly<T::Public>,
+        to_verify: bool,
+    ) -> bool {
+        if to_verify {
             assert_eq!(
                 false,
                 partials
                     .iter()
-                    .any(|p| T::partial_verify(&vss_public, &msg, &p).is_err())
+                    .any(|p| T::partial_verify(&vss_public, &MSG, &p).is_err())
             );
         }
         let final_sig = T::aggregate(partials.len(), &partials).unwrap();
-        T::verify(vss_public.public_key(), &msg, &final_sig).is_ok()
+        T::verify(vss_public.public_key(), &MSG, &final_sig).is_ok()
     }
 
     pub fn test_threshold_scheme<T: ThresholdScheme + SignatureScheme>(n: usize, t: usize) {
@@ -159,8 +174,8 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::test_utils::*;
+    use super::*;
 
     #[test]
     fn threshold_g1_128() {

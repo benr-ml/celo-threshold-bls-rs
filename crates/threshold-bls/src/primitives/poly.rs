@@ -1,11 +1,8 @@
-use crate::curve::group::{Group, Element, Point, Scalar};
+use crate::curve::group::{Element, Group, Point, Scalar};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
-
-pub type PrivatePoly<C> = Poly<<C as Group>::Scalar>;
-pub type PublicPoly<C> = Poly<<C as Group>::Point>;
 
 pub type Idx = u32;
 
@@ -26,6 +23,9 @@ impl<A: fmt::Display> fmt::Display for Eval<A> {
 /// the type of the variable, which is always a scalar.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Poly<C>(Vec<C>);
+
+pub type PrivatePoly<C> = Poly<<C as Group>::Scalar>;
+pub type PublicPoly<C> = Poly<<C as Group>::Point>;
 
 impl<C> Poly<C> {
     /// Returns the degree of the polynomial
@@ -53,14 +53,12 @@ impl<C: Element> Poly<C> {
 
     /// get returns the given coefficient at the requested index. It will panic
     /// if the index is out of range,i.e. `if i > self.degree()`.
-    /// TODO: use Result
     pub fn get(&self, i: Idx) -> C {
         self.0[i as usize].clone()
     }
 
     /// set the given element at the specified index. The index 0 is the free
     /// coefficient of the polynomial. It panics if the index is out of range.
-    /// TODO: use Result
     pub fn set(&mut self, index: usize, value: C) {
         self.0[index] = value;
     }
@@ -75,8 +73,6 @@ impl<C: Element> Poly<C> {
     }
 
     /// Returns a polynomial from the given list of coefficients
-    // TODO fix semantics of zero:
-    // it should be G1::zero() as only element
     pub fn zero() -> Self {
         Self::from(vec![C::zero()])
     }
@@ -86,13 +82,11 @@ impl<C: Element> Poly<C> {
     }
 
     /// Performs polynomial addition in place
-    /// TODO: use Result (when degrees are different)
     pub fn add(&mut self, other: &Self) {
         // if we have a smaller degree we should pad with zeros
         if self.0.len() < other.0.len() {
             self.0.resize(other.0.len(), C::zero())
         }
-
         self.0.iter_mut().zip(&other.0).for_each(|(a, b)| a.add(&b))
     }
 }
@@ -352,6 +346,13 @@ impl<C: fmt::Display> fmt::Display for Poly<C> {
     }
 }
 
+pub fn is_valid_share<C: Group>(idx: Idx, share: &C::Scalar, public: &PublicPoly<C>) -> bool {
+    let mut e = C::Point::one();
+    e.mul(&share);
+    let pub_eval = public.eval(idx);
+    pub_eval.value == e
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -512,7 +513,7 @@ pub mod tests {
         let degree = 49;
         let threshold = degree + 1;
         let poly = Poly::<Sc>::new(degree);
-        let shares = (1..threshold+1)
+        let shares = (1..threshold + 1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
         let now = SystemTime::now();
@@ -521,7 +522,7 @@ pub mod tests {
             Ok(e) => println!("single recover: time elapsed {:?}", e),
             Err(e) => panic!("{}", e),
         }
-        let shares = (1..threshold+1)
+        let shares = (1..threshold + 1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
 

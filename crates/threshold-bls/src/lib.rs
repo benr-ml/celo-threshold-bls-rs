@@ -145,6 +145,8 @@ pub mod primitives;
 /// BLS Signature implementations. Supports blind and threshold signatures.
 pub mod sig;
 
+pub mod dkg;
+
 /// Pre-instantiated signature schemes for each curve
 pub mod schemes {
     use crate::sig::{G1Scheme, G2Scheme};
