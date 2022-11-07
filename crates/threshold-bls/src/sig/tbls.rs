@@ -1,5 +1,5 @@
 //! Threshold Signatures implementation for any type which implements
-//! [`SignatureScheme`](../trait.SignatureScheme.html)
+//! `SignatureScheme`.
 use crate::primitives::poly::{Eval, Idx, Poly, PolyError};
 use crate::sig::{Partial, SignatureScheme, ThresholdScheme};
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ impl<I: SignatureScheme> ThresholdScheme for I {
             index: private.index,
             value: sig,
         };
-        let ret = bincode::serialize(&partial)?;
+        let ret = bincode::serialize(&partial)?; // TODO remove the index
         Ok(ret)
     }
 

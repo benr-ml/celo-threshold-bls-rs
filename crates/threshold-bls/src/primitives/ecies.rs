@@ -28,7 +28,7 @@
 //! assert_eq!(&message[..], &cleartext[..]);
 //! ```
 
-use crate::curve::group::{Element, Group};
+use crate::curve::group::{Element, Group, Scalar};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -112,22 +112,25 @@ pub fn create_delegated_key<C: Group, R: CryptoRng + RngCore>(
     let mut key = cipher.ephemeral.clone();
     key.mul(&sk);
 
-    // NIZKPoK for the DDH tuple [G, ephemeral=zG, pk=sk G, key=sk zG]
+    // NIZKPoK for the DDH tuple [G, Ephemeral=eG, PK=sk G, Key=sk eG].
+    // Prover selects a random r and sends A=rG, B=reG.
+    // Prover computes challenge c and sends z=r+c sk.
+    // Verifier checks that zG=A+cPK and zeG=B+cKey.
     let r = C::Scalar::rand(rng);
-    let mut rG = C::Point::one();
-    rG.mul(&r);
-    let mut rH = cipher.ephemeral.clone();
-    rH.mul(&r);
+    let mut a = C::Point::one();
+    a.mul(&r);
+    let mut b = cipher.ephemeral.clone();
+    b.mul(&r);
 
     // TODO: Derive from a RO for a unique metadata.
     let challenge = C::Scalar::one();
-    let mut z = challenge.clone();
+    let mut z = challenge;
     z.mul(sk);
     z.add(&r);
 
     EciesDelegatedKey {
         key,
-        proof: (rG, rH, z),
+        proof: (a, b, z),
     }
 }
 
@@ -138,16 +141,18 @@ pub fn decrypt_with_delegated_key<C: Group>(
 ) -> Result<Vec<u8>, AError> {
     // Verify the NIZK proof.
     // TODO: Derive from a RO for a unique metadata.
-    let challenge = C::Scalar::one();
+    let mut challenge = C::Scalar::one();
     if !is_valid_relation::<C>(
-        &delegated_key.proof.0,
+        &delegated_key.proof.0, // A
         pk,
-        &delegated_key.proof.2,
+        &C::Point::one(),
+        &delegated_key.proof.2, // z
         &challenge,
     ) || !is_valid_relation::<C>(
-        &delegated_key.proof.1,
+        &delegated_key.proof.1, // B
         &delegated_key.key,
-        &delegated_key.proof.2,
+        &cipher.ephemeral,
+        &delegated_key.proof.2, // z
         &challenge,
     ) {
         return Err(AError);
@@ -159,14 +164,14 @@ pub fn decrypt_with_delegated_key<C: Group>(
     aead.decrypt(&nonce_obj, &cipher.aead[..])
 }
 
-/// Checks if zG = e1 + e2*c.
-fn is_valid_relation<C: Group>(e1: &C::Point, e2: &C::Point, z: &C::Scalar, c: &C::Scalar) -> bool {
-    let mut expected_zG = e2.clone();
-    expected_zG.mul(c);
-    expected_zG.add(&e1);
-    let mut zG = C::Point::one();
-    zG.mul(&z);
-    zG == expected_zG
+/// Checks if e1 + e2*c = z e3
+fn is_valid_relation<C: Group>(e1: &C::Point, e2: &C::Point, e3: &C::Point, z: &C::Scalar, c: &C::Scalar) -> bool {
+    let mut expected_e = e2.clone();
+    expected_e.mul(c);
+    expected_e.add(&e1);
+    let mut e = e3.clone();
+    e.mul(&z);
+    e == expected_e
 }
 
 /// Derives an ephemeral key from the provided public key.
@@ -210,5 +215,21 @@ mod tests {
         // having an invalid ciphertext should fail
         cipher.aead = vec![0; 32];
         decrypt::<G1Curve>(&s2, &cipher).unwrap_err();
+    }
+
+    #[test]
+    fn test_delegated_key() {
+        let (sk, pk) = kp();
+        let data = vec![1, 2, 3, 4];
+
+        // decryption with the right key OK
+        let cipher = encrypt::<G1Curve, _>(&pk, &data, &mut thread_rng());
+        let mut delegated_key = create_delegated_key(&sk, &cipher, &mut thread_rng());
+        let plaintext = decrypt_with_delegated_key(&delegated_key, &cipher, &pk).unwrap();
+        assert_eq!(data, plaintext);
+
+        delegated_key.proof.0.add(&delegated_key.proof.1);
+        let plaintext = decrypt_with_delegated_key(&delegated_key, &cipher, &pk);
+        assert!(plaintext.is_err());
     }
 }

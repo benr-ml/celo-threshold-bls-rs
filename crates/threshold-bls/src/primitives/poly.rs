@@ -123,6 +123,7 @@ where
         }
     }
 
+    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     /// Given at least `t` polynomial evaluations, it will recover the polynomial's
     /// constant term
     pub fn recover_c0(t: usize, shares: Vec<Eval<C>>) -> Result<C, PolyError> {
@@ -157,6 +158,7 @@ where
         Ok(acc)
     }
 
+    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     /// Given at least `t` polynomial evaluations, it will recover the entire polynomial
     pub fn recover(t: usize, shares: Vec<Eval<C>>) -> Result<Self, PolyError> {
         let xs = Self::share_map(t, shares)?;
@@ -192,6 +194,7 @@ where
         Ok(res)
     }
 
+    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     fn share_map(
         t: usize,
         mut shares: Vec<Eval<C>>,

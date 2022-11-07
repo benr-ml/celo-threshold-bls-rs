@@ -1,3 +1,5 @@
+//! Instantiations of BLS12-381 elements.
+
 use crate::curve::group::{self, Element, PairingCurve as PC, Point, Scalar as Sc};
 use ff::{Field, PrimeField};
 use groupy::CurveProjective;
@@ -10,7 +12,6 @@ pub type G1 = PG1;
 pub type G2 = PG2;
 pub type GT = Fq12;
 
-/// Implementation of Scalar using field elements used in BLS12-381
 impl Sc for Scalar {
     fn set_int(&mut self, i: u64) {
         *self = Fr::from_repr(FrRepr::from(i)).unwrap();
@@ -70,6 +71,7 @@ impl Element for G1 {
     }
 }
 
+/// G2 points can be multiplied by Fr elements
 impl Element for G2 {
     type RHS = Scalar;
 
@@ -110,14 +112,12 @@ impl Element for GT {
     }
 }
 
-/// Implementation of Point using G1 from BLS12-381
 impl Point for G1 {
     fn map(&mut self, data: &[u8]) {
         *self = G1::hash(data);
     }
 }
 
-/// Implementation of Point using G2 from BLS12-381
 impl Point for G2 {
     fn map(&mut self, data: &[u8]) {
         *self = G2::hash(data);
@@ -138,8 +138,8 @@ impl PC for PairingCurve {
     }
 }
 
-pub type G1Curve = group::G1Curve<PairingCurve>;
-pub type G2Curve = group::G2Curve<PairingCurve>;
+pub type G1Curve = group::PairingCurveG1<PairingCurve>;
+pub type G2Curve = group::PairingCurveG2<PairingCurve>;
 
 #[cfg(test)]
 mod tests {

@@ -50,8 +50,7 @@ pub trait Point: Element {
     fn map(&mut self, data: &[u8]);
 }
 
-/// A group holds functionalities to create scalar and points related; it is
-/// similar to the Engine definition, just much more simpler.
+/// A group holds functionalities to create scalar and points related.
 pub trait Group: Clone + Debug + Send + Sync {
     /// The group's scalar
     type Scalar: Scalar<RHS = Self::Scalar>;
@@ -97,5 +96,5 @@ where
     type Point = P;
 }
 
-pub(crate) type G1Curve<C> = GroupFrom<<C as PairingCurve>::Scalar, <C as PairingCurve>::G1>;
-pub(crate) type G2Curve<C> = GroupFrom<<C as PairingCurve>::Scalar, <C as PairingCurve>::G2>;
+pub(crate) type PairingCurveG1<C> = GroupFrom<<C as PairingCurve>::Scalar, <C as PairingCurve>::G1>;
+pub(crate) type PairingCurveG2<C> = GroupFrom<<C as PairingCurve>::Scalar, <C as PairingCurve>::G2>;

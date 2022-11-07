@@ -1,3 +1,4 @@
+//! Traits for working with signatures and threshold signatures.
 pub use super::tbls::Share; // import and re-export it for easier access
 use crate::{
     curve::group::{Element, Point, Scalar},
@@ -70,12 +71,9 @@ pub type Partial = Vec<u8>;
 /// ThresholdScheme is a threshold-based `t-n` signature scheme. The security of
 /// such a scheme means at least `t` participants are required produce a "partial
 /// signature" to then produce a regular signature.
-/// The `dkg-core` module allows participants to create a distributed private/public key
-/// that can be used with implementations `ThresholdScheme`.
 pub trait ThresholdScheme: Scheme {
     /// Error produced when partially signing, aggregating or verifying
     type Error: Error;
-    // TODO: define a types for Poly<Self::Public>.
 
     /// Partially signs a message with a share of the private key
     fn partial_sign(private: &Share<Self::Private>, msg: &[u8]) -> Result<Partial, Self::Error>;
