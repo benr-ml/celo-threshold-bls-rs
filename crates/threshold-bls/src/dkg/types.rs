@@ -11,7 +11,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct Node<C: Group>(pub Idx, pub C::Point);
 
 impl<C: Group> Node<C> {
+    /// index must be positive.
     pub fn new(index: Idx, public: C::Point) -> Self {
+        assert!(index > 0);
         Self(index, public)
     }
     /// Returns the node's index
@@ -26,7 +28,7 @@ impl<C: Group> Node<C> {
 
 pub(crate) type Nodes<C> = Vec<Node<C>>;
 
-// TODO: fix serialization everywhere.
+// TODO: test serialization of everything.
 
 /// DkgFirstMessage holds all encrypted shares a dealer creates during the first
 /// phase of the protocol.
@@ -55,6 +57,7 @@ pub struct EncryptedShare<C: Group> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DkgSecondMessage<C: Group> {
     pub claimer: Idx,
+    // List of complaints against other dealers. Empty if there are non.
     pub complaints: Vec<Complaint<C>>,
 }
 

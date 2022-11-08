@@ -38,12 +38,12 @@
 //! let private_poly = Poly::<<SigScheme as Scheme>::Private>::new(t - 1);
 //!
 //! // Evaluate it at `n` points to generate the shares
-//! let shares = (0..n)
+//! let shares = (1..n+1)
 //!     .map(|i| {
 //!         let eval = private_poly.eval(i as Idx);
 //!         Share {
 //!             index: eval.index,
-//!             private: eval.value,
+//!             value: eval.value,
 //!         }
 //!     })
 //!     .collect::<Vec<_>>();

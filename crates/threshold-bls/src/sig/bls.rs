@@ -29,20 +29,18 @@ pub mod common {
     /// BLS signature over G1 or G2.
     pub trait BLSScheme: Scheme {
         /// Returns sig = msg^{private}. The message MUST be hashed before this call.
-        fn internal_sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, BLSError> {
+        fn internal_sign(private: &Self::Private, msg: &[u8]) -> Result<Self::Signature, BLSError> {
             let mut h = Self::Signature::new();
             h.map(msg);
             h.mul(private);
-            let serialized = bincode::serialize(&h)?;
-            Ok(serialized)
+            Ok(h)
         }
 
         fn internal_verify(
             public: &Self::Public,
             msg: &[u8],
-            sig_bytes: &[u8],
+            sig: &Self::Signature,
         ) -> Result<(), BLSError> {
-            let sig: Self::Signature = bincode::deserialize_from(sig_bytes)?;
             let mut h = Self::Signature::new();
             h.map(msg);
             let success = Self::verify_pairings(public, &sig, &h);
@@ -62,7 +60,7 @@ pub mod common {
     {
         type Error = BLSError;
 
-        fn sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, Self::Error> {
+        fn sign(private: &Self::Private, msg: &[u8]) -> Result<Self::Signature, Self::Error> {
             T::internal_sign(private, msg)
         }
 
@@ -70,9 +68,9 @@ pub mod common {
         fn verify(
             public: &Self::Public,
             msg_bytes: &[u8],
-            sig_bytes: &[u8],
+            sig: &Self::Signature,
         ) -> Result<(), Self::Error> {
-            T::internal_verify(public, msg_bytes, sig_bytes)
+            T::internal_verify(public, msg_bytes, sig)
         }
     }
 }

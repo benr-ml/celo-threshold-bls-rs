@@ -1,5 +1,6 @@
 //! Traits for working with signatures and threshold signatures.
 pub use super::tbls::Share; // import and re-export it for easier access
+use crate::primitives::poly::IndexedValue;
 use crate::{
     curve::group::{Element, Point, Scalar},
     primitives::poly::Poly,
@@ -58,15 +59,14 @@ pub trait SignatureScheme: Scheme {
     type Error: Error;
 
     /// Signs the message with the provided private key and returns a serialized signature
-    fn sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, Self::Error>;
+    fn sign(private: &Self::Private, msg: &[u8]) -> Result<Self::Signature, Self::Error>;
 
     /// Verifies that the signature on the provided message was produced by the public key
     /// TODO: return a bool
-    fn verify(public: &Self::Public, msg: &[u8], sig: &[u8]) -> Result<(), Self::Error>;
+    fn verify(public: &Self::Public, msg: &[u8], sig: &Self::Signature) -> Result<(), Self::Error>;
 }
 
-/// Partial is simply an alias to denote a partial signature.
-pub type Partial = Vec<u8>;
+pub type PartialSignature<S> = IndexedValue<S>;
 
 /// ThresholdScheme is a threshold-based `t-n` signature scheme. The security of
 /// such a scheme means at least `t` participants are required produce a "partial
@@ -76,18 +76,24 @@ pub trait ThresholdScheme: Scheme {
     type Error: Error;
 
     /// Partially signs a message with a share of the private key
-    fn partial_sign(private: &Share<Self::Private>, msg: &[u8]) -> Result<Partial, Self::Error>;
+    fn partial_sign(
+        private: &Share<Self::Private>,
+        msg: &[u8],
+    ) -> Result<PartialSignature<Self::Signature>, Self::Error>;
 
     /// Verifies a partial signature on a message against the public polynomial
     /// TODO: return a bool
     fn partial_verify(
         public: &Poly<Self::Public>,
         msg: &[u8],
-        partial: &[u8],
+        partial: &PartialSignature<Self::Signature>,
     ) -> Result<(), Self::Error>;
 
     /// Aggregates all partials signature together. Note that this method does
     /// not verify if the partial signatures are correct or not; it only
     /// aggregates them.
-    fn aggregate(threshold: usize, partials: &[Partial]) -> Result<Vec<u8>, Self::Error>;
+    fn aggregate(
+        threshold: usize,
+        partials: &[PartialSignature<Self::Signature>],
+    ) -> Result<Self::Signature, Self::Error>;
 }

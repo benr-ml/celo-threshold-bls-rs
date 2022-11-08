@@ -7,10 +7,12 @@ use thiserror::Error;
 pub type Idx = u32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Eval<A> {
+pub struct IndexedValue<A> {
     pub index: Idx,
     pub value: A,
 }
+
+pub type Eval<A> = IndexedValue<A>;
 
 impl<A: fmt::Display> fmt::Display for Eval<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -123,7 +125,6 @@ where
         }
     }
 
-    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     /// Given at least `t` polynomial evaluations, it will recover the polynomial's
     /// constant term
     pub fn recover_c0(t: usize, shares: Vec<Eval<C>>) -> Result<C, PolyError> {

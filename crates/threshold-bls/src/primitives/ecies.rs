@@ -28,7 +28,7 @@
 //! assert_eq!(&message[..], &cleartext[..]);
 //! ```
 
-use crate::curve::group::{Element, Group, Scalar};
+use crate::curve::group::{Element, Group};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -141,7 +141,7 @@ pub fn decrypt_with_delegated_key<C: Group>(
 ) -> Result<Vec<u8>, AError> {
     // Verify the NIZK proof.
     // TODO: Derive from a RO for a unique metadata.
-    let mut challenge = C::Scalar::one();
+    let challenge = C::Scalar::one();
     if !is_valid_relation::<C>(
         &delegated_key.proof.0, // A
         pk,
@@ -165,7 +165,13 @@ pub fn decrypt_with_delegated_key<C: Group>(
 }
 
 /// Checks if e1 + e2*c = z e3
-fn is_valid_relation<C: Group>(e1: &C::Point, e2: &C::Point, e3: &C::Point, z: &C::Scalar, c: &C::Scalar) -> bool {
+fn is_valid_relation<C: Group>(
+    e1: &C::Point,
+    e2: &C::Point,
+    e3: &C::Point,
+    z: &C::Scalar,
+    c: &C::Scalar,
+) -> bool {
     let mut expected_e = e2.clone();
     expected_e.mul(c);
     expected_e.add(&e1);
