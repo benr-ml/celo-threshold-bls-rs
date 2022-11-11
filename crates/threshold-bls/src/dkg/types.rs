@@ -39,7 +39,7 @@ pub struct DkgFirstMessage<C: Group> {
     /// The encrypted shares created by the dealer.
     pub encrypted_shares: Vec<EncryptedShare<C>>,
     /// The commitment of the secret polynomial created by the dealer.
-    // TODO: NIZKPoK
+    // TODO: add a proof of possession/knowledge.
     pub vss_pk: PublicPoly<C>,
 }
 

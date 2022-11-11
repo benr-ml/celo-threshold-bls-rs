@@ -101,6 +101,10 @@ pub enum PolyError {
     NoInverse,
 }
 
+// TODO: Some of the functions/steps below may be executed many times in practice thus cache can be
+// used to improve efficiency (e.g., eval(i) may be called with the same index every time a partial
+// signature from party i is verified).
+
 impl<C> Poly<C>
 where
     C: Element,

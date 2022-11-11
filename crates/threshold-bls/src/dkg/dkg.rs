@@ -14,7 +14,6 @@ use crate::{
     sig::Share,
 };
 
-use crate::schemes::bls12_381::G2Scheme;
 use rand::thread_rng;
 use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -54,6 +53,9 @@ pub type SharesMap<C> = HashMap<Idx, <C as Group>::Scalar>;
 ///
 /// Can be instantiated with G1Curve or G2Curve.
 impl<C: Group> DkgDealer<C> {
+    // TODO add an API that generates an ecies sk, and returns the pk & proof of knowledge. To
+    // be used when registering as a validator. Also the code that verifies such a message.
+
     /// Creates a new DkgLeader instance from the provided secret key, set of nodes and RNG.
     pub fn new<R: CryptoRng + RngCore>(
         ecies_sk: C::Scalar,
@@ -112,7 +114,8 @@ impl<C: Group> DkgDealer<C> {
     /// to everyone. It contains the list of complaints on invalid shares. In addition, it returns
     /// a set of valid shares (so far).
     /// Since we assume that at most t-1 of the nodes are malicious, we only need messages from
-    /// t nodes to guarantee an unbiasable and unpredictable beacon.
+    /// t nodes to guarantee an unbiasable and unpredictable beacon. (The result is secure with
+    /// rushing adversaries as proven in https://eprint.iacr.org/2021/005.pdf.)
     pub fn create_second_message<R: CryptoRng + RngCore>(
         &self,
         messages: &[DkgFirstMessage<C>],
