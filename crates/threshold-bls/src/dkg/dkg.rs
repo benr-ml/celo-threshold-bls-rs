@@ -31,6 +31,8 @@ struct DkgDealer<C: Group> {
     vss_pk: Poly<C::Point>,
 }
 
+// TODO: ECIES and its NIZKPoK should work with a more efficient curve like Ed25519.
+
 /// DkgOutput is the final output of the DKG protocol in case it runs
 /// successfully.
 /// It can be used later with G1Scheme/G2Scheme's partial_sign, partial_verify and aggregate.
@@ -53,7 +55,7 @@ pub type SharesMap<C> = HashMap<Idx, <C as Group>::Scalar>;
 ///
 /// Can be instantiated with G1Curve or G2Curve.
 impl<C: Group> DkgDealer<C> {
-    // TODO add an API that generates an ecies sk, and returns the pk & proof of knowledge. To
+    // TODO: add an API that generates an ecies sk, and returns the pk & proof of knowledge. To
     // be used when registering as a validator. Also the code that verifies such a message.
 
     /// Creates a new DkgLeader instance from the provided secret key, set of nodes and RNG.
