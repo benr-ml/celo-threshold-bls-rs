@@ -32,7 +32,7 @@ pub(crate) type Nodes<C> = Vec<Node<C>>;
 
 /// DkgFirstMessage holds all encrypted shares a dealer creates during the first
 /// phase of the protocol.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
 pub struct DkgFirstMessage<C: Group> {
     pub dealer: Idx,
@@ -45,16 +45,19 @@ pub struct DkgFirstMessage<C: Group> {
 
 /// EncryptedShare holds the ECIES encryption of a share destined to the
 /// `receiver`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(bound = "C::Scalar: DeserializeOwned")]
 pub struct EncryptedShare<C: Group> {
     pub receiver: Idx,
+    // TODO: Replace with a Enc(hkdf(g^{sk_i sk_j}), share) instead of sending a random group
+    // element, or extend ECIES to work like that.
     pub encryption: EciesCipher<C>,
 }
 
 /// A `DkgSecondMessage` is sent during the second phase of the protocol. It includes complaints
 /// created by receiver of invalid encrypted shares.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(bound = "C::Scalar: DeserializeOwned")]
 pub struct DkgSecondMessage<C: Group> {
     pub claimer: Idx,
     // List of complaints against other dealers. Empty if there are non.
@@ -62,10 +65,15 @@ pub struct DkgSecondMessage<C: Group> {
 }
 
 /// A complaint/fraud claim against a dealer that created invalid encrypted share.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(bound = "C::Scalar: DeserializeOwned")]
 pub enum Complaint<C: Group> {
     /// The identity of the dealer.
     NoShare(Idx),
     /// The identity of the dealer and the delegated key.
+    // An alternative to using ECIES & ZKPoK for complaints is to use different ECIES public key
+    // for each sender, and in case of a complaint, simply reveal the relevant secret key.
+    // This saves the ZKPoK with the price of publishing one ECIES public key & PoP for each party,
+    // resulting in larger communication in the happy path.
     InvalidEncryptedShare(Idx, EciesDelegatedKey<C>),
 }

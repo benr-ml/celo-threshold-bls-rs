@@ -50,14 +50,14 @@ const EPHEMERAL_KEY_LENGTH: usize = 32;
 const DOMAIN: &str = "ecies:";
 
 /// An ECIES encrypted cipher. Contains the ciphertext's bytes and the ephemeral public key.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EciesCipher<C: Group> {
     aead: Vec<u8>,
     ephemeral: C::Point,
 }
 
 // A key that allows decrypting a specific EciesCipher along with a proof of correctness.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EciesDelegatedKey<C: Group> {
     // The encryption's key that can be used to decrypt the message.
     key: C::Point,
