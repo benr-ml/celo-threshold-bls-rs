@@ -1,10 +1,7 @@
 [workspace]
 
-members = [ 
-    "crates/dkg-core", 
-    "crates/dkg-cli",
+members = [
     "crates/threshold-bls",
-    "crates/threshold-bls-ffi",
 ]
 
 [profile.release]
@@ -23,7 +20,6 @@ rpath = false
 lto = "thin"
 incremental = true
 debug-assertions = false
-
 
 [profile.test]
 opt-level = 3

@@ -1,19 +1,18 @@
-use crate::group::{Curve, Element, Point, Scalar};
-use rand_core::RngCore;
+use crate::curve::group::{Element, Group, Point, Scalar};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
 
-pub type PrivatePoly<C> = Poly<<C as Curve>::Scalar>;
-pub type PublicPoly<C> = Poly<<C as Curve>::Point>;
-
 pub type Idx = u32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Eval<A> {
-    pub value: A,
+pub struct IndexedValue<A> {
     pub index: Idx,
+    pub value: A,
 }
+
+pub type Eval<A> = IndexedValue<A>;
 
 impl<A: fmt::Display> fmt::Display for Eval<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -27,10 +26,13 @@ impl<A: fmt::Display> fmt::Display for Eval<A> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Poly<C>(Vec<C>);
 
+pub type PrivatePoly<C> = Poly<<C as Group>::Scalar>;
+pub type PublicPoly<C> = Poly<<C as Group>::Point>;
+
 impl<C> Poly<C> {
     /// Returns the degree of the polynomial
     pub fn degree(&self) -> usize {
-        // e.g. c_3 * x^3 + c_2 * x^2 + c_1 * x + c_0
+        // e.g. c_0 + c_1 * x + c_2 * x^2 + c_3 * x^3
         // ^ 4 coefficients correspond to a 3rd degree poly
         self.0.len() - 1
     }
@@ -46,7 +48,7 @@ impl<C: Element> Poly<C> {
     /// Returns a new polynomial of the given degree where each coefficients is
     /// sampled at random from the given RNG.
     /// In the context of secret sharing, the threshold is the degree + 1.
-    pub fn new_from<R: RngCore>(degree: usize, rng: &mut R) -> Self {
+    pub fn new_from<R: CryptoRng + RngCore>(degree: usize, rng: &mut R) -> Self {
         let coeffs: Vec<C> = (0..=degree).map(|_| C::rand(rng)).collect();
         Self::from(coeffs)
     }
@@ -73,9 +75,6 @@ impl<C: Element> Poly<C> {
     }
 
     /// Returns a polynomial from the given list of coefficients
-    // TODO: implement the From<> trait
-    // TODO fix semantics of zero:
-    // it should be G1::zero() as only element
     pub fn zero() -> Self {
         Self::from(vec![C::zero()])
     }
@@ -90,7 +89,6 @@ impl<C: Element> Poly<C> {
         if self.0.len() < other.0.len() {
             self.0.resize(other.0.len(), C::zero())
         }
-
         self.0.iter_mut().zip(&other.0).for_each(|(a, b)| a.add(&b))
     }
 }
@@ -103,6 +101,10 @@ pub enum PolyError {
     NoInverse,
 }
 
+// TODO: Some of the functions/steps below may be executed many times in practice thus cache can be
+// used to improve efficiency (e.g., eval(i) may be called with the same index every time a partial
+// signature from party i is verified).
+
 impl<C> Poly<C>
 where
     C: Element,
@@ -110,11 +112,10 @@ where
 {
     /// Evaluates the polynomial at the specified value.
     pub fn eval(&self, i: Idx) -> Eval<C> {
+        assert!(i > 0); // Never reveal the secret coefficient directly.
+
         let mut xi = C::RHS::new();
-        // +1 because we must never evaluate the polynomial at its first point
-        // otherwise it reveals the "secret" value !
-        // TODO: maybe move that a layer above, to not mix ss scheme with poly.
-        xi.set_int((i + 1).into());
+        xi.set_int(i.into());
 
         let res = self.0.iter().rev().fold(C::zero(), |mut sum, coeff| {
             sum.mul(&xi);
@@ -123,14 +124,14 @@ where
         });
 
         Eval {
-            value: res,
             index: i,
+            value: res,
         }
     }
 
     /// Given at least `t` polynomial evaluations, it will recover the polynomial's
     /// constant term
-    pub fn recover(t: usize, shares: Vec<Eval<C>>) -> Result<C, PolyError> {
+    pub fn recover_c0(t: usize, shares: Vec<Eval<C>>) -> Result<C, PolyError> {
         let xs = Self::share_map(t, shares)?;
 
         // iterate over all indices and for each multiply the lagrange basis
@@ -145,10 +146,8 @@ where
                 if i == j {
                     continue;
                 }
-
                 // xj - 0
                 num.mul(&xj.0);
-
                 // 1 / (xj - xi)
                 let mut tmp = xj.0.clone();
                 tmp.sub(&xi.0);
@@ -164,8 +163,9 @@ where
         Ok(acc)
     }
 
+    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     /// Given at least `t` polynomial evaluations, it will recover the entire polynomial
-    pub fn full_recover(t: usize, shares: Vec<Eval<C>>) -> Result<Self, PolyError> {
+    pub fn recover(t: usize, shares: Vec<Eval<C>>) -> Result<Self, PolyError> {
         let xs = Self::share_map(t, shares)?;
 
         // iterate over all indices and for each multiply the lagrange basis
@@ -199,6 +199,7 @@ where
         Ok(res)
     }
 
+    // TODO: decide if needed and review or wrap most of it with #[cfg(test)]
     fn share_map(
         t: usize,
         mut shares: Vec<Eval<C>>,
@@ -217,7 +218,7 @@ where
             .take(t)
             .fold(BTreeMap::new(), |mut m, sh| {
                 let mut xi = C::RHS::new();
-                xi.set_int((sh.index + 1).into());
+                xi.set_int(sh.index.into());
                 m.insert(sh.index, (xi, sh.value));
                 m
             });
@@ -246,6 +247,7 @@ impl<C: Element> From<Poly<C>> for Vec<C> {
     }
 }
 
+// TODO: decide if needed and review or wrap most of it with #[cfg(test)]
 impl<X: Scalar<RHS = X>> Poly<X> {
     /// Performs the multiplication operation.
     ///
@@ -253,7 +255,7 @@ impl<X: Scalar<RHS = X>> Poly<X> {
     /// but may be inneficient for other purposes: the degree of the returned polynomial
     /// is always the greatest possible, regardless of the actual coefficients
     /// given.
-    // TODO: Implement divide and conquer algorithm
+    // TODO: Implement divide and conquer algorithm (if not needed only for tests)
     fn mul(&mut self, other: &Self) {
         if self.is_zero() || other.is_zero() {
             *self = Self::zero();
@@ -352,7 +354,13 @@ impl<C: fmt::Display> fmt::Display for Poly<C> {
     }
 }
 
-#[cfg(feature = "bls12_381")]
+pub fn is_valid_share<C: Group>(idx: Idx, share: &C::Scalar, public: &PublicPoly<C>) -> bool {
+    let mut e = C::Point::one();
+    e.mul(&share);
+    let pub_eval = public.eval(idx);
+    pub_eval.value == e
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -439,14 +447,14 @@ pub mod tests {
         let poly = Poly::<Sc>::new(degree);
         let expected = poly.0[0];
 
-        let shares = (0..num_evals)
+        let shares = (1..(num_evals+1))
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<_>>();
 
-        let recovered_poly = Poly::<Sc>::full_recover(num_evals, shares.clone()).unwrap();
+        let recovered_poly = Poly::<Sc>::recover(num_evals, shares.clone()).unwrap();
         let computed = recovered_poly.0[0];
 
-        let recovered_constant = Poly::<Sc>::recover(num_evals, shares).unwrap();
+        let recovered_constant = Poly::<Sc>::recover_c0(num_evals, shares).unwrap();
 
         // if we had enough evaluations we must get the correct term
         if num_evals > degree {
@@ -461,9 +469,9 @@ pub mod tests {
     }
 
     #[test]
-    fn eval(d in 0..100usize, idx in 0..(100 as Idx)) {
+    fn eval(d in 0..100usize, idx in 1..(100 as Idx)) {
         let mut x = Sc::new();
-        x.set_int(idx as u64 + 1);
+        x.set_int(idx as u64);
 
         let p1 = Poly::<Sc>::new(d);
         let evaluation = p1.eval(idx).value;
@@ -499,12 +507,12 @@ pub mod tests {
         let poly = Poly::<Sc>::new(degree);
 
         // insufficient shares gathered
-        let shares = (0..threshold - 1)
+        let shares = (1..threshold)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<_>>();
 
-        Poly::<Sc>::recover(threshold, shares.clone()).unwrap_err();
-        Poly::<Sc>::full_recover(threshold, shares).unwrap_err();
+        Poly::<Sc>::recover_c0(threshold, shares.clone()).unwrap_err();
+        Poly::<Sc>::recover(threshold, shares).unwrap_err();
     }
 
     #[test]
@@ -513,21 +521,21 @@ pub mod tests {
         let degree = 49;
         let threshold = degree + 1;
         let poly = Poly::<Sc>::new(degree);
-        let shares = (0..threshold)
+        let shares = (1..threshold + 1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
         let now = SystemTime::now();
-        Poly::<Sc>::recover(threshold as usize, shares).unwrap();
+        Poly::<Sc>::recover_c0(threshold as usize, shares).unwrap();
         match now.elapsed() {
             Ok(e) => println!("single recover: time elapsed {:?}", e),
             Err(e) => panic!("{}", e),
         }
-        let shares = (0..threshold)
+        let shares = (1..threshold + 1)
             .map(|i| poly.eval(i as Idx))
             .collect::<Vec<Eval<Sc>>>();
 
         let now = SystemTime::now();
-        Poly::<Sc>::full_recover(threshold as usize, shares).unwrap();
+        Poly::<Sc>::recover(threshold as usize, shares).unwrap();
         match now.elapsed() {
             Ok(e) => println!("full_recover: time elapsed {:?}", e),
             Err(e) => panic!("{}", e),
@@ -568,7 +576,7 @@ pub mod tests {
         total.add(&l1);
         total.add(&l2);
         total.add(&l3);
-        let res = p3.eval(0);
+        let res = p3.eval(1);
         assert_eq!(total, res.value);
     }
 

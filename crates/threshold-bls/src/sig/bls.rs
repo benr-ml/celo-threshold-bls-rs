@@ -1,4 +1,4 @@
-use crate::group::{Element, PairingCurve, Point};
+use crate::curve::group::{Element, PairingCurve, Point};
 use crate::sig::{Scheme, SignatureScheme};
 use std::{fmt::Debug, marker::PhantomData};
 use thiserror::Error;
@@ -29,51 +29,29 @@ pub mod common {
     /// BLS signature over G1 or G2.
     pub trait BLSScheme: Scheme {
         /// Returns sig = msg^{private}. The message MUST be hashed before this call.
-        fn internal_sign(
-            private: &Self::Private,
-            msg: &[u8],
-            should_hash: bool,
-        ) -> Result<Vec<u8>, BLSError> {
-            let mut h = if should_hash {
-                let mut h = Self::Signature::new();
-                h.map(msg).map_err(|_| BLSError::HashingError)?;
-                h
-            } else {
-                bincode::deserialize_from(msg)?
-            };
-
+        fn internal_sign(private: &Self::Private, msg: &[u8]) -> Result<Self::Signature, BLSError> {
+            let mut h = Self::Signature::new();
+            h.map(msg);
             h.mul(private);
-
-            let serialized = bincode::serialize(&h)?;
-            Ok(serialized)
+            Ok(h)
         }
 
         fn internal_verify(
             public: &Self::Public,
             msg: &[u8],
-            sig_bytes: &[u8],
-            should_hash: bool,
+            sig: &Self::Signature,
         ) -> Result<(), BLSError> {
-            let sig: Self::Signature = bincode::deserialize_from(sig_bytes)?;
-
-            let h = if should_hash {
-                let mut h = Self::Signature::new();
-                h.map(msg).map_err(|_| BLSError::HashingError)?;
-                h
-            } else {
-                bincode::deserialize_from(msg)?
-            };
-
-            let success = Self::final_exp(public, &sig, &h);
+            let mut h = Self::Signature::new();
+            h.map(msg);
+            let success = Self::verify_pairings(public, &sig, &h);
             if !success {
                 return Err(BLSError::InvalidSig);
             }
-
             Ok(())
         }
 
         /// Performs the final exponentiation for the BLS sig scheme
-        fn final_exp(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool;
+        fn verify_pairings(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool;
     }
 
     impl<T> SignatureScheme for T
@@ -82,17 +60,17 @@ pub mod common {
     {
         type Error = BLSError;
 
-        fn sign(private: &Self::Private, msg: &[u8]) -> Result<Vec<u8>, Self::Error> {
-            T::internal_sign(private, msg, true)
+        fn sign(private: &Self::Private, msg: &[u8]) -> Result<Self::Signature, Self::Error> {
+            T::internal_sign(private, msg)
         }
 
         /// Verifies the signature by the provided public key
         fn verify(
             public: &Self::Public,
             msg_bytes: &[u8],
-            sig_bytes: &[u8],
+            sig: &Self::Signature,
         ) -> Result<(), Self::Error> {
-            T::internal_verify(public, msg_bytes, sig_bytes, true)
+            T::internal_verify(public, msg_bytes, sig)
         }
     }
 }
@@ -117,7 +95,7 @@ impl<C> common::BLSScheme for G1Scheme<C>
 where
     C: PairingCurve,
 {
-    fn final_exp(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool {
+    fn verify_pairings(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool {
         // e(g1,sig) == e(pub, H(m))
         // e(g1,H(m))^x == e(g1,H(m))^x
         let left = C::pair(&C::G1::one(), &sig);
@@ -146,7 +124,7 @@ impl<C> common::BLSScheme for G2Scheme<C>
 where
     C: PairingCurve,
 {
-    fn final_exp(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool {
+    fn verify_pairings(p: &Self::Public, sig: &Self::Signature, hm: &Self::Signature) -> bool {
         // e(sig,g2) == e(H(m),pub)
         // e(H(m),g2)^x == e(H(m),g2)^x
         let left = C::pair(&sig, &Self::Public::one());
@@ -155,15 +133,14 @@ where
     }
 }
 
-#[cfg(feature = "bls12_381")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::curve::bls12381::{Curve as G1Curve, G2Curve, PairingCurve as PCurve};
-    use crate::group::Curve;
+    use crate::curve::bls12381::{G1Curve, G2Curve, PairingCurve as PCurve};
+    use crate::curve::group::Group;
     use rand::prelude::*;
 
-    fn keypair<C: Curve>() -> (C::Scalar, C::Point) {
+    fn keypair<C: Group>() -> (C::Scalar, C::Point) {
         let private = C::Scalar::rand(&mut thread_rng());
         let mut public = C::Point::one();
         public.mul(&private);

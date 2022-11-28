@@ -18,41 +18,6 @@
 //! SigScheme::verify(&public, &msg[..], &sig).expect("signature should be verified");
 //! ```
 //!
-//! ## Blind Signatures
-//!
-//! Blind signatures are supported via an implementation based on this
-//! [paper](https://eprint.iacr.org/2018/733.pdf).
-//!
-//! The procedure is the same, but we import the [`SignatureSchemeExt`] because it requires
-//! signing the blinded message without hashing it. Note that verification is done in the same
-//! way as before on the unblinded signature and message.
-//!
-//! ```rust
-//! // import the instantiated scheme and the traits for signing and generating keys
-//! use threshold_bls::{
-//!     schemes::bls12_381::G1Scheme as SigScheme,
-//!     sig::{Scheme, SignatureScheme, BlindScheme}
-//! };
-//!
-//! let (private, public) = SigScheme::keypair(&mut rand::thread_rng());
-//! let msg = b"hello";
-//!
-//! // the blinding factor needs to be saved for unblinding later
-//! let (blinding_factor, blinded) = SigScheme::blind_msg(&msg[..], &mut rand::thread_rng());
-//!
-//! // sign the blinded message
-//! let blinded_sig = SigScheme::blind_sign(&private, &blinded).unwrap();
-//! // verify the blinded signature with the blinded message. This can be done
-//! // by any third party given the blinded signature & message, since they are
-//! // not private.
-//! SigScheme::blind_verify(&public, &blinded, &blinded_sig).expect("blinded signature should verify");
-//!
-//! // unblind the signature
-//! let clear_sig = SigScheme::unblind_sig(&blinding_factor, &blinded_sig).expect("unblind should not fail");
-//!
-//! SigScheme::verify(&public, &msg[..], &clear_sig).expect("signature should be verified");
-//! ```
-//!
 //! ## Threshold Signatures
 //!
 //! First a threshold keypair must be generated. This is done utilizing [polynomials](poly).
@@ -63,7 +28,7 @@
 //!
 //! ```rust
 //! use threshold_bls::{
-//!     poly::{Poly, Idx},
+//!     primitives::poly::{Poly, Idx},
 //!     schemes::bls12_381::G1Scheme as SigScheme,
 //!     sig::{Scheme, SignatureScheme, ThresholdScheme, Share}
 //! };
@@ -73,12 +38,12 @@
 //! let private_poly = Poly::<<SigScheme as Scheme>::Private>::new(t - 1);
 //!
 //! // Evaluate it at `n` points to generate the shares
-//! let shares = (0..n)
+//! let shares = (1..n+1)
 //!     .map(|i| {
 //!         let eval = private_poly.eval(i as Idx);
 //!         Share {
 //!             index: eval.index,
-//!             private: eval.value,
+//!             value: eval.value,
 //!         }
 //!     })
 //!     .collect::<Vec<_>>();
@@ -175,42 +140,21 @@
 /// Curve implementations for the traits defined in the [`group`](group/index.html) module.
 pub mod curve;
 
-/// Elliptic Curve Integrated Encryption Scheme using SHA256 as the Key Derivation
-pub mod ecies;
-
-/// Definitions of generic traits with scalars of prime fields and points on elliptic curves.
-pub mod group;
-
-/// Implementation of a polynomial suitable to be used for secret sharing schemes and DKG
-/// protocols. It can evaluate and interpolate private and public shares to their corresponding
-/// polynomial.
-pub mod poly;
+pub mod primitives;
 
 /// BLS Signature implementations. Supports blind and threshold signatures.
 pub mod sig;
+
+pub mod dkg;
 
 /// Pre-instantiated signature schemes for each curve
 pub mod schemes {
     use crate::sig::{G1Scheme, G2Scheme};
 
-    #[cfg(feature = "bls12_381")]
-    /// BLS12-381 Schemes
     pub mod bls12_381 {
         use crate::curve::bls12381::PairingCurve;
 
-        pub use crate::curve::bls12381::{Curve as G1Curve, G2Curve};
-
-        /// Public Keys on G1, Signatures on G2
-        pub type G1Scheme = super::G1Scheme<PairingCurve>;
-        /// Public Keys on G2, Signatures on G1
-        pub type G2Scheme = super::G2Scheme<PairingCurve>;
-    }
-
-    #[cfg(feature = "bls12_377")]
-    /// BLS12-377 Schemes
-    pub mod bls12_377 {
-        use crate::curve::zexe::PairingCurve;
-        pub use crate::curve::zexe::{G1Curve, G2Curve};
+        pub use crate::curve::bls12381::{G1Curve, G2Curve};
 
         /// Public Keys on G1, Signatures on G2
         pub type G1Scheme = super::G1Scheme<PairingCurve>;
