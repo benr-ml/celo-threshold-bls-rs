@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use curve::bls12381::PairingCurve;
 use std::time::Duration;
 use threshold_bls::curve;
-use threshold_bls::primitives::poly::{Idx, Poly};
 use threshold_bls::sig::test_utils::*;
 use threshold_bls::sig::{G2Scheme, Share, SignatureScheme, ThresholdScheme};
 

@@ -21,7 +21,6 @@ lto = "thin"
 incremental = true
 debug-assertions = false
 
-
 [profile.test]
 opt-level = 3
 incremental = true

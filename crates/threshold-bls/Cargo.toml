@@ -24,7 +24,6 @@ groupy = {version = "0.4.1", optional = true }
 
 thiserror = "1.0"
 bincode = "1.3.3"
-rayon = "1.5.3"
 
 [features]
 default = ["bls12_381"]

@@ -1,13 +1,6 @@
-# BLS Threshold CryptoSignatures
-
-This library provides primitives for (blind) threshold cryptography. Currently supported
-curves are BLS12-377 and BLS12-381.
-
-**Work In Progress: DO NOT EXPECT ANY STABLE API NOW**
-
 ## Group functionality
 
-[`src/group.rs`](src/group.rs) contains the definitions of generic trait to work
+[`src/curve/group.rs`](src/curve/group.rs) contains the definitions of generic trait to work
 with scalars of prime fields and points on elliptic curves. The following
 `Element` trait allows to get a generic implementation of a polynomial with lagrange interpolation for both scalars and points.
 ```rust
@@ -25,11 +18,11 @@ pub trait Element<RHS = Self>: Clone + fmt::Display + fmt::Debug + Eq {
 ```
 
 There is an implementation of these traits using the curve BLS12-381 in
-[`src/bls12381.rs`](src/bls12381.rs).
+[`src/curve/bls12381.rs`](src/curve/bls12381.rs).
 
 ## Polynomial functionality
 
-[`src/poly.rs`](src/primitives/poly.rs) contains the implementation of a polynomial
+[`src/primitives/poly.rs`](src/primitives/poly.rs) contains the implementation of a polynomial
 suitable to be used for secret sharing schemes and the dkg protocol. It can
 evaluates shares and interpolate private and public shares to their
 corresponding polynomial.
@@ -51,18 +44,4 @@ fn interpolation() {
     let computed = recovered.c[0];
     assert_eq!(expected, computed);
 }
-```
-
-## Curve Implementations
-
-Curently there are two curves available, `BLS12 381` and `BLS 377`. By default they are enabled both, but you can select which one you want to use using
-the features `bls12_381` and `bls_377`.
-
-You can use them like this when adding the dependency to your `Cargo.toml` file.
-
-```toml
-# Only bls12_381
-threshold = { version = "0.1", default-features = false, features = ["bls12_381"] }
-# Both
-threshold = { version = "0.1" }
 ```
